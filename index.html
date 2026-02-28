@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Eu Escolho Você</title>
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at center, #2b0033, #0d0013);
+  background-color: #0d0013;
+  color: white;
+  text-align: center;
+  overflow: hidden;
+}
+
+.scene {
+  position: absolute;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 1s ease;
+  padding: 30px;
+  z-index: 1;
+}
+
+.scene.active {
+  opacity: 1;
+}
+
+button {
+  margin-top: 20px;
+  padding: 12px 25px;
+  background: #8b0000;
+  border: none;
+  color: white;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+h1, h2 {
+  color: #d48cff;
+}
+
+#contador {
+  font-size: 22px;
+  margin-top: 20px;
+}
+
+canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+
+<div class="scene active" id="scene1">
+  <h1 id="typing"></h1>
+  <button class="nextBtn">Continuar</button>
+</div>
+
+<div class="scene" id="scene2">
+  <h2>28 de Outubro de 2025</h2>
+  <p>Uma conversa simples que virou parte da minha vida.</p>
+  <button class="nextBtn">Continuar</button>
+</div>
+
+<div class="scene" id="scene3">
+  <h2>24 de Dezembro</h2>
+  <p>O melhor presente de Natal que eu já recebi.</p>
+  <button class="nextBtn">Continuar</button>
+</div>
+
+<div class="scene" id="scene4">
+  <h2>Nossos Sonhos</h2>
+  <p>
+    Viajar o mundo juntos 🌍<br>
+    Ir em shows do BTS 💜<br>
+    Date nights comendo doce 🍫<br>
+    Natal de conchinha 🎄
+  </p>
+  <button class="nextBtn">Continuar</button>
+</div>
+
+<div class="scene" id="scene5">
+  <h2>Já fazem...</h2>
+  <div id="contador"></div>
+  <button class="nextBtn">Continuar</button>
+</div>
+
+<div class="scene" id="scene6">
+  <h1>Eu escolho você.</h1>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  let currentScene = 1;
+  const scenes = document.querySelectorAll(".scene");
+  const buttons = document.querySelectorAll(".nextBtn");
+
+  buttons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      scenes[currentScene - 1].classList.remove("active");
+      currentScene++;
+      if (currentScene <= scenes.length) {
+        scenes[currentScene - 1].classList.add("active");
+      }
+    });
+  });
+
+  const text = "Você quer ver a história que ainda está sendo escrita?";
+  let i = 0;
+  function type() {
+    const typingElement = document.getElementById("typing");
+    if (!typingElement) return;
+    if (i < text.length) {
+      typingElement.innerHTML += text.charAt(i);
+      i++;
+      setTimeout(type, 50);
+    }
+  }
+  type();
+
+  const startDate = new Date("2025-10-28T00:00:00");
+  const contador = document.getElementById("contador");
+  function updateCounter() {
+    if (!contador) return;
+    const now = new Date();
+    const diff = now - startDate;
+    const dias = Math.floor(diff / (1000*60*60*24));
+    contador.innerHTML = dias + " dias juntos 💜";
+  }
+  updateCounter();
+  setInterval(updateCounter, 1000);
+
+  const canvas = document.getElementById("stars");
+  const ctx = canvas.getContext("2d");
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+
+  let stars = [];
+  for (let i = 0; i < 120; i++) {
+    stars.push({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      radius: Math.random() * 1.5,
+      speed: Math.random() * 0.3
+    });
+  }
+
+  function animateStars() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "white";
+    stars.forEach(star => {
+      ctx.beginPath();
+      ctx.arc(star.x, star.y, star.radius, 0, Math.PI*2);
+      ctx.fill();
+      star.y += star.speed;
+      if (star.y > canvas.height) star.y = 0;
+    });
+    requestAnimationFrame(animateStars);
+  }
+  animateStars();
+});
+</script>
+
+</body>
+</html>
