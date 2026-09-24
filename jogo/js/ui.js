@@ -1,6 +1,6 @@
 // Interface: HUD, mensagens do Grande Sábio, diálogos, menus e minimapa.
 import * as THREE from 'three';
-import { SKILLS, STAGES, QUESTS, SPECIES, MONSTERS, NAME_COST, xpNext, PLACES } from './data.js';
+import { SKILLS, STAGES, QUESTS, SPECIES, MONSTERS, NAME_COST, xpNext, PLACES, REGIONS } from './data.js';
 import { HALF } from './world.js';
 import { sfx } from './audio.js';
 
@@ -277,7 +277,7 @@ export class UI {
     if (big) {
       c.font = '600 13px "M PLUS Rounded 1c", system-ui, sans-serif';
       c.textAlign = 'center';
-      const labels = [['Gruta do Selo', 0, 172], ['Vila Goblin', -95, -30], ['Lago Cristalino', -150, 110], ['Covil', 120, -70], ['Acampamento Ogro', 70, -165], ['Planícies', 155, 95]];
+      const labels = REGIONS.filter((r) => r.id !== 'montanhas').map((r) => [r.nome, r.x, r.z]);
       for (const [n, x, z] of labels) {
         const [mx, my] = toMap(x, z);
         c.lineWidth = 3; c.strokeStyle = 'rgba(6,10,26,.8)'; c.strokeText(n, mx, my - 8);

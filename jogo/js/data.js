@@ -78,6 +78,7 @@ export const PLACES = {
   covil: { x: 120, z: -70 },
   acampamento: { x: 70, z: -165 },
   lobos: { x: 60, z: -10 },
+  planicie: { x: 155, z: 95 },
 };
 
 // Grupos de monstros: tipo, centro, raio, quantidade.

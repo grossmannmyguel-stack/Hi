@@ -15,7 +15,8 @@ const CFG_KEY = 'slimeRenascido.cfg.v1';
 const DRAGON_NAME = 'Kaizor';
 const RADIUS = { aranha: 1.0, lobo: 0.9, morcego: 0.7, serpente: 0.8, lagarto: 1.2, ogro: 1.2, loboAlfa: 1.5, ogroChefe: 2.0 };
 const DRAGON_SCALE = 1.3;
-const SEAL = { x: PLACES.dragao.x, z: PLACES.dragao.z - DRAGON_SCALE, r: 11.2 * DRAGON_SCALE + 0.3 };
+// O dragão pode mudar de lugar para caber no mapa do Meshy, então o selo lê a posição na hora.
+const SEAL = { get x() { return PLACES.dragao.x; }, get z() { return PLACES.dragao.z - DRAGON_SCALE; }, r: 11.2 * DRAGON_SCALE + 0.3 };
 
 function storage(fn) { try { return fn(); } catch { return null; } }
 

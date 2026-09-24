@@ -1,9 +1,11 @@
 // Mundo aberto: terreno procedural, biomas, água, árvores, céu e ciclo de dia e noite.
 import * as THREE from 'three';
 import { makeNoise, mulberry32, clamp, lerp, smoothstep } from './util.js';
-import { REGIONS, WATER_Y, PLACES } from './data.js';
+import { REGIONS, WATER_Y, PLACES, SPAWNS } from './data.js';
 import { makeHut, makeCampfire, makeCustom, customParts } from './models.js';
 import { Grass } from './grass.js';
+import { fitWorldMesh, sampleWorldMesh, isWaterColor } from './worldmesh.js';
+import { customScene } from './models.js';
 
 export const HALF = 240;
 const SEG = 240;
@@ -87,6 +89,7 @@ export class World {
     for (let j = 0; j < N; j++) {
       for (let i = 0; i < N; i++) this.heights[j * N + i] = computeHeight(-HALF + i * CELL, -HALF + j * CELL);
     }
+    this.setupWorldMesh();
     this.buildTerrain();
     this.buildWater();
     this.buildSky();
@@ -95,6 +98,173 @@ export class World {
     this.buildLandmarks();
     this.buildLights();
     this.buildMinimapImage();
+  }
+
+  // Mapa inteiro feito no Meshy: vira o chão visível e a fonte das alturas e cores.
+  setupWorldMesh() {
+    const src = customScene('mundo');
+    if (!src) return;
+    const root = fitWorldMesh(src, HALF * 2, 48);
+    const orig = sampleWorldMesh(root, N, HALF);
+    // Gira/espelha o mapa (8 opções) para as regiões do jogo caírem em terra ou água certas.
+    const variant = this.bestOrientation(orig);
+    const { heights, colors } = this.remapGrid(orig, variant);
+    root.rotation.y = variant.rot * Math.PI / 2;
+    if (variant.flip) root.scale.x = -1;
+    root.updateMatrixWorld(true);
+    // A água é a do próprio modelo (as partes azuis); o chão mais baixo da terra fica em y ≈ 0,3.
+    const mask = new Uint8Array(N * N);
+    const land = [];
+    for (let k = 0; k < N * N; k++) {
+      if (isWaterColor(colors[k * 3], colors[k * 3 + 1], colors[k * 3 + 2])) mask[k] = 1;
+      else land.push(heights[k]);
+    }
+    land.sort((a, b) => a - b);
+    const shift = -(land.length ? land[Math.floor(land.length * 0.03)] : 0) + 0.3;
+    for (let k = 0; k < N * N; k++) heights[k] += shift;
+    // As árvores "assadas" no modelo viram morrinhos estreitos: uma abertura morfológica
+    // (mínimo e depois máximo numa janela) tira esses morrinhos e mantém montanhas largas.
+    const R = 5;
+    const win = (src, fn) => {
+      const tmp = new Float32Array(N * N), out = new Float32Array(N * N);
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        let v = src[j * N + i];
+        for (let d = -R; d <= R; d++) { const ii = i + d; if (ii >= 0 && ii < N) v = fn(v, src[j * N + ii]); }
+        tmp[j * N + i] = v;
+      }
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        let v = tmp[j * N + i];
+        for (let d = -R; d <= R; d++) { const jj = j + d; if (jj >= 0 && jj < N) v = fn(v, tmp[jj * N + i]); }
+        out[j * N + i] = v;
+      }
+      return out;
+    };
+    const opened = win(win(heights, Math.min), Math.max);
+    this.treeTops = [];
+    for (let j = 1; j < N - 1; j++) for (let i = 1; i < N - 1; i++) {
+      const k = j * N + i, bump = heights[k] - opened[k];
+      if (bump > 4 && heights[k] >= heights[k - 1] && heights[k] >= heights[k + 1] && heights[k] >= heights[k - N] && heights[k] >= heights[k + N]) {
+        this.treeTops.push([-HALF + i * CELL, -HALF + j * CELL, bump]);
+      }
+    }
+    for (let k = 0; k < N * N; k++) heights[k] = opened[k];
+    this.waterMask = mask;
+    root.position.y += shift;
+    root.updateMatrixWorld(true);
+    root.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = true; } });
+    this.heights = heights;
+    this.meshColors = colors;
+    this.worldMesh = root;
+    this.scene.add(root);
+    this.relocateToMap();
+    // Troncos das árvores do modelo: colisão no centro de cada copa.
+    for (const [x, z, b] of this.treeTops) this.addCollider(x, z, Math.min(2.5, 0.6 + b * 0.08));
+  }
+
+  // Terra firme e plana perto de (x, z): testa pontos em espiral e devolve o primeiro bom.
+  findLand(x, z, rad, maxDist = 170) {
+    const ok = (px, pz) => {
+      if (Math.abs(px) > HALF - rad - 12 || Math.abs(pz) > HALF - rad - 12) return false;
+      let land = 0, n = 0, mn = 1e9, mx = -1e9;
+      for (let a = 0; a < 12; a++) for (const f of [0.35, 0.7, 1]) {
+        const qx = px + Math.cos(a * 0.5236) * rad * f, qz = pz + Math.sin(a * 0.5236) * rad * f;
+        const h = this.heightAt(qx, qz);
+        n++; if (!this.inWater(qx, qz)) land++;
+        mn = Math.min(mn, h); mx = Math.max(mx, h);
+      }
+      return land / n > 0.9 && mx - mn < Math.max(4, rad * 0.25) && !this.inWater(px, pz);
+    };
+    for (let d = 0; d <= maxDist; d += 4) {
+      const steps = Math.max(1, Math.round((d * Math.PI * 2) / 8));
+      for (let k = 0; k < steps; k++) {
+        const a = (k / steps) * Math.PI * 2, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+        if (ok(px, pz)) return [px, pz];
+      }
+    }
+    return [x, z];
+  }
+
+  // Água mais próxima (para o Lago Cristalino e as serpentes).
+  findWater(x, z, maxDist = 200) {
+    for (let d = 0; d <= maxDist; d += 4) {
+      const steps = Math.max(1, Math.round((d * Math.PI * 2) / 8));
+      for (let k = 0; k < steps; k++) {
+        const a = (k / steps) * Math.PI * 2, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+        if (this.inWater(px, pz) && this.inWater(px + 6, pz) && this.inWater(px - 6, pz) && this.inWater(px, pz + 6) && this.inWater(px, pz - 6)) return [px, pz];
+      }
+    }
+    return [x, z];
+  }
+
+  // O jogo se adapta ao mapa do Meshy: cada região vai para a terra (ou água) mais próxima.
+  relocateToMap() {
+    const move = (obj, nx, nz) => { const dx = nx - obj.x, dz = nz - obj.z; obj.x = nx; obj.z = nz; return [dx, dz]; };
+    const G = REG.gruta;
+    const [gx, gz] = this.findLand(G.x, G.z, 26);
+    const [gdx, gdz] = move(G, gx, gz);
+    for (const k of ['inicio', 'dragao', 'saida']) { PLACES[k].x += gdx; PLACES[k].z += gdz; }
+    const V = REG.vila;
+    const [vdx, vdz] = move(V, ...this.findLand(V.x, V.z, 22));
+    PLACES.anciao.x += vdx; PLACES.anciao.z += vdz;
+    for (const id of ['covil', 'acampamento', 'planicie']) {
+      const r = REG[id];
+      const [dx, dz] = move(r, ...this.findLand(r.x, r.z, id === 'planicie' ? 20 : 16));
+      if (PLACES[id]) { PLACES[id].x += dx; PLACES[id].z += dz; }
+      for (const sp of SPAWNS) if (Math.hypot(sp.x - (r.x - dx), sp.z - (r.z - dz)) < r.r) { sp.x += dx; sp.z += dz; }
+    }
+    const L = REG.lago;
+    move(L, ...this.findWater(L.x, L.z));
+    for (const sp of SPAWNS) {
+      if (sp.t === 'serpente') {
+        const [wx, wz] = this.findWater(sp.x, sp.z);
+        const [lx, lz] = this.findLand(wx, wz, 6, 60);
+        sp.x = lx; sp.z = lz;
+      } else if (this.inWater(sp.x, sp.z) || !this.findLandOk(sp.x, sp.z)) {
+        [sp.x, sp.z] = this.findLand(sp.x, sp.z, Math.max(6, sp.r * 0.6));
+      }
+    }
+    const [lx, lz] = this.findLand(PLACES.lobos.x, PLACES.lobos.z, 10);
+    PLACES.lobos.x = lx; PLACES.lobos.z = lz;
+    for (const c of CLEARINGS) { const [cx, cz] = this.findLand(c[0], c[1], c[2] * 0.7); c[0] = cx; c[1] = cz; }
+  }
+
+  findLandOk(x, z) { return !this.inWater(x, z) && !this.inWater(x + 5, z) && !this.inWater(x - 5, z); }
+
+  // Índice na grade original para um ponto do jogo, dado rotação (múltiplos de 90°) e espelho.
+  srcIndex(x, z, v) {
+    const th = v.rot * Math.PI / 2, c = Math.round(Math.cos(th)), sn = Math.round(Math.sin(th));
+    let ox = x * c - z * sn;
+    const oz = x * sn + z * c;
+    if (v.flip) ox = -ox;
+    const i = Math.round((ox + HALF) / CELL), j = Math.round((oz + HALF) / CELL);
+    return Math.min(N - 1, Math.max(0, j)) * N + Math.min(N - 1, Math.max(0, i));
+  }
+
+  remapGrid(src, v) {
+    const heights = new Float32Array(N * N), colors = new Float32Array(N * N * 3);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const k = j * N + i, o = this.srcIndex(-HALF + i * CELL, -HALF + j * CELL, v);
+      heights[k] = src.heights[o];
+      colors[k * 3] = src.colors[o * 3]; colors[k * 3 + 1] = src.colors[o * 3 + 1]; colors[k * 3 + 2] = src.colors[o * 3 + 2];
+    }
+    return { heights, colors };
+  }
+
+  bestOrientation(src) {
+    const water = (o) => isWaterColor(src.colors[o * 3], src.colors[o * 3 + 1], src.colors[o * 3 + 2]);
+    const sorted = Float32Array.from(src.heights).sort();
+    const high = sorted[Math.floor(sorted.length * 0.85)];
+    const landSpots = [[0, 172], [0, 190], [-95, -30], [120, -70], [70, -165], [155, 95], [0, 128], [60, -10], [-35, 60]];
+    let best = null;
+    for (let rot = 0; rot < 4; rot++) for (const flip of [false, true]) {
+      const v = { rot, flip };
+      let score = 0;
+      for (const [x, z] of landSpots) for (const [dx, dz] of [[0, 0], [8, 0], [-8, 0], [0, 8], [0, -8]]) if (!water(this.srcIndex(x + dx, z + dz, v))) score += 1;
+      for (const [dx, dz] of [[0, 0], [15, 0], [-15, 0], [0, 15], [0, -15]]) if (water(this.srcIndex(-150 + dx, 110 + dz, v))) score += 1.5;
+      for (let x = -200; x <= 200; x += 25) if (src.heights[this.srcIndex(x, -200, v)] >= high) score += 0.8;
+      if (!best || score > best.score) best = { ...v, score };
+    }
+    return best;
   }
 
   // Altura exata do triângulo do terreno em (x, z).
@@ -116,7 +286,7 @@ export class World {
     const k = j * N + i, c = this.colors;
     const r = c[k * 3], g = c[k * 3 + 1], b = c[k * 3 + 2];
     out.setRGB(r * 0.9, g * 1.05, b * 0.8);
-    if (this.heights[k] < 0.4 || this.heights[k] > 28) return 0;
+    if (this.heights[k] < 0.4 || this.heights[k] > 28 || (this.waterMask && this.waterMask[k])) return 0;
     return clamp((g - Math.max(r, b) * 1.08) * 9, 0, 1);
   }
 
@@ -127,7 +297,13 @@ export class World {
   }
 
   groundAt(x, z) { return Math.max(this.heightAt(x, z), WATER_Y - 0.25); }
-  inWater(x, z) { return this.heightAt(x, z) < WATER_Y - 0.3; }
+  inWater(x, z) {
+    if (this.waterMask) {
+      const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL);
+      return i >= 0 && j >= 0 && i < N && j < N && this.waterMask[j * N + i] === 1;
+    }
+    return this.heightAt(x, z) < WATER_Y - 0.3;
+  }
 
   regionAt(x, z) {
     if (Math.hypot(x - REG.gruta.x, z - REG.gruta.z) < REG.gruta.r) return REG.gruta;
@@ -175,8 +351,12 @@ export class World {
         const hx = H[j * N + Math.min(N - 1, i + 1)] - H[j * N + Math.max(0, i - 1)];
         const hz = H[Math.min(N - 1, j + 1) * N + i] - H[Math.max(0, j - 1) * N + i];
         const slope = Math.hypot(hx, hz) / (2 * CELL);
-        const c = this.colorAt(x, z, h, slope);
-        col[k * 3] = c.r; col[k * 3 + 1] = c.g; col[k * 3 + 2] = c.b;
+        if (this.meshColors) {
+          col[k * 3] = this.meshColors[k * 3]; col[k * 3 + 1] = this.meshColors[k * 3 + 1]; col[k * 3 + 2] = this.meshColors[k * 3 + 2];
+        } else {
+          const c = this.colorAt(x, z, h, slope);
+          col[k * 3] = c.r; col[k * 3 + 1] = c.g; col[k * 3 + 2] = c.b;
+        }
       }
     }
     const idx = new Uint32Array(SEG * SEG * 6);
@@ -195,6 +375,7 @@ export class World {
     g.computeVertexNormals();
     this.terrain = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }));
     this.terrain.receiveShadow = true;
+    this.terrain.visible = !this.worldMesh;
     this.scene.add(this.terrain);
   }
 
@@ -252,6 +433,7 @@ export class World {
     }));
     this.water.position.y = WATER_Y;
     this.water.renderOrder = 2;
+    this.water.visible = !this.worldMesh;
     this.scene.add(this.water);
   }
 
@@ -339,6 +521,14 @@ export class World {
   treeDensity(x, z, h) {
     if (h < 0.9 || h > 31) return 0;
     for (const [lx, lz, lr] of CLEARINGS) if (Math.hypot(x - lx, z - lz) < lr) return 0;
+    if (this.meshColors) {
+      // No mapa do Meshy, as árvores nascem onde o chão é verde.
+      if (Math.hypot(x - REG.gruta.x, z - REG.gruta.z) < 40 || Math.hypot(x - REG.vila.x, z - REG.vila.z) < 26) return 0;
+      const i = Math.round((x + HALF) / CELL), j = Math.round((z + HALF) / CELL), k = j * N + i, c = this.meshColors;
+      const green = c[k * 3 + 1] - Math.max(c[k * 3], c[k * 3 + 2]);
+      if (this.waterMask[k]) return 0;
+      return green > 0.03 ? 0.08 : 0;
+    }
     const g = grutaInfo(x, z);
     if (g.d < 62) return 0;
     for (const id of ['vila', 'acampamento']) if (Math.hypot(x - REG[id].x, z - REG[id].z) < REG[id].r * 1.05) return 0;
@@ -528,11 +718,11 @@ export class World {
   buildLandmarks() {
     const G = REG.gruta, V = REG.vila;
     this.placeLandmark('entradaGruta', G.x, G.z - 33, 0, { sink: 0.8 });
-    this.placeLandmark('ruinas', -32, 92, 0.4, { sink: 0.5 });
-    this.placeLandmark('ruinas', 150, 20, -1.2, { sink: 0.5 });
+    this.placeLandmark('ruinas', CLEARINGS[0][0], CLEARINGS[0][1], 0.4, { sink: 0.5 });
+    this.placeLandmark('ruinas', CLEARINGS[1][0], CLEARINGS[1][1], -1.2, { sink: 0.5 });
     this.placeLandmark('torre', V.x + 20, V.z + 12, -0.8, { sink: 0.2, solid: 'redondo' });
     this.placeLandmark('torre', V.x + 17, V.z - 16, -2.2, { sink: 0.2, solid: 'redondo' });
-    this.placeLandmark('torre', 58, -140, 2.4, { sink: 0.2, solid: 'redondo' });
+    this.placeLandmark('torre', CLEARINGS[2][0], CLEARINGS[2][1], 2.4, { sink: 0.2, solid: 'redondo' });
   }
 
   setVillageLevel(level) {
@@ -575,7 +765,7 @@ export class World {
         const i = Math.round((px / (S - 1)) * SEG), j = Math.round((py / (S - 1)) * SEG);
         const k = j * N + i;
         const o = (py * S + px) * 4;
-        if (this.heights[k] < WATER_Y) {
+        if (this.waterMask ? this.waterMask[k] : this.heights[k] < WATER_Y) {
           img.data[o] = 42; img.data[o + 1] = 120; img.data[o + 2] = 190;
         } else {
           img.data[o] = this.colors[k * 3] * 255;

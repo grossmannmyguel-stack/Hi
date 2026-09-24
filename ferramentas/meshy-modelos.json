@@ -160,6 +160,33 @@
       "altura": 12,
       "poligonos": 20000,
       "prompt": "tall wooden goblin watchtower on stilts with a thatched roof lookout platform, rope ladder, torn banners, spiked wooden palisade at the base, fantasy game environment asset"
+    },
+    {
+      "id": "mundoA",
+      "prioridade": 4,
+      "altura": 40,
+      "poligonos": 150000,
+      "mundo": true,
+      "prompt": "huge open world fantasy island landscape terrain seen from above, square map tile, lush green forest with many trees, a big blue lake with sandy shore, snowy jagged mountain range along the north edge, a dark crystal cave in rocky hills to the south, a small goblin village clearing with straw huts in the west, dirt paths connecting every area, mostly flat walkable ground, complete game level environment, stylized anime JRPG world map diorama, vibrant colors",
+      "descartado": "Versão do mapa não escolhida (ficou a B)."
+    },
+    {
+      "id": "mundoB",
+      "prioridade": 4,
+      "altura": 40,
+      "poligonos": 150000,
+      "mundo": true,
+      "prompt": "huge open world fantasy island landscape terrain seen from above, square map tile, lush green forest with many trees, a big blue lake with sandy shore, snowy jagged mountain range along the north edge, a dark crystal cave in rocky hills to the south, a small goblin village clearing with straw huts in the west, dirt paths connecting every area, mostly flat walkable ground, complete game level environment, hand painted stylized fantasy game terrain, Genshin Impact style",
+      "usadoComo": "mundo"
+    },
+    {
+      "id": "mundoC",
+      "prioridade": 4,
+      "altura": 40,
+      "poligonos": 150000,
+      "mundo": true,
+      "prompt": "huge open world fantasy island landscape terrain seen from above, square map tile, lush green forest with many trees, a big blue lake with sandy shore, snowy jagged mountain range along the north edge, a dark crystal cave in rocky hills to the south, a small goblin village clearing with straw huts in the west, dirt paths connecting every area, mostly flat walkable ground, complete game level environment, detailed realistic fantasy terrain, cinematic",
+      "descartado": "Versão do mapa não escolhida (ficou a B)."
     }
   ]
 }

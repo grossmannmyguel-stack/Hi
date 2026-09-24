@@ -596,6 +596,8 @@ export async function loadManifest() {
   return manifest;
 }
 
+export function customScene(id) { const e = manifest && manifest[id]; return e && e._gltf ? e._gltf.scene : null; }
+
 export function hasCustom(id) { return !!(manifest && manifest[id] && manifest[id]._gltf); }
 
 async function loadFile(name) {
