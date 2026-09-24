@@ -71,13 +71,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--sage); outl
 #mapWrap.big #minimap { width: min(78vh, 78vw); height: min(78vh, 78vw); border-radius: 16px; }
 #clock { font-family: var(--mono); font-size: 12px; color: var(--ink); background: var(--panel); padding: 2px 8px; border-radius: 8px; font-variant-numeric: tabular-nums; }
 
-#bossBar { position: fixed; top: calc(12px + var(--st)); left: calc(292px + var(--sl)); right: calc(142px + var(--sr)); max-width: 420px; margin: 0 auto; z-index: 4; text-align: center; }
+#bossBar { position: fixed; top: calc(12px + var(--st)); left: calc(330px + var(--sl)); right: calc(142px + var(--sr)); max-width: 420px; margin: 0 auto; z-index: 4; text-align: center; }
 #bossName { font-family: var(--display); font-weight: 700; font-size: 15px; color: #ffd0d6; text-shadow: 0 2px 6px #000; }
 .bar.boss { height: 10px; margin-top: 3px; border: 1px solid rgba(255,90,110,0.5); }
 .bar.boss i { background: linear-gradient(90deg, #8a1c2c, var(--hp)); }
 
 /* ---------- Grande Sábio ---------- */
-.sage { position: fixed; top: calc(12px + var(--st)); left: calc(292px + var(--sl)); right: calc(142px + var(--sr)); max-width: 460px; margin: 0 auto; padding: 7px 12px 8px; background: rgba(4, 18, 26, 0.86); border: 1px solid rgba(159,243,232,0.55); outline: 1px solid rgba(159,243,232,0.18); outline-offset: 3px; border-radius: 4px; z-index: 6; pointer-events: none; }
+.sage { position: fixed; top: calc(12px + var(--st)); left: calc(330px + var(--sl)); right: calc(142px + var(--sr)); max-width: 460px; margin: 0 auto; padding: 7px 12px 8px; background: rgba(4, 18, 26, 0.86); border: 1px solid rgba(159,243,232,0.55); outline: 1px solid rgba(159,243,232,0.18); outline-offset: 3px; border-radius: 4px; z-index: 6; pointer-events: none; }
 .sage small { display: block; font-family: var(--mono); font-size: 11px; color: var(--sage); letter-spacing: 0.08em; opacity: 0.85; }
 .sage p { margin: 2px 0 0; font-family: var(--mono); font-size: 13.5px; line-height: 1.35; color: #dffcf8; }
 .sage.in { animation: sageIn 0.25s ease-out; }
@@ -223,6 +223,61 @@ input { font-family: var(--ui); font-size: 16px; color: var(--ink); background: 
 #hurt.on { animation: hurt 0.45s ease-out; }
 @keyframes hurt { 0% { opacity: 1; } 100% { opacity: 0; } }
 
+
+/* ================= Interface nova (moldura dourada, ícones do Canva) ================= */
+:root { --gold2: #ffe39a; --rim: linear-gradient(145deg, #fff1b8, #c8912e 35%, #6b4312 60%, #f2c14e); }
+.frame { position: relative; background: linear-gradient(180deg, rgba(20,28,64,0.92), rgba(7,10,28,0.92)); border: 1px solid rgba(242,193,78,0.55); box-shadow: 0 0 0 1px rgba(0,0,0,0.6), inset 0 0 18px rgba(88,196,255,0.12), 0 6px 22px rgba(0,0,0,0.45); }
+.frame::before, .frame::after { content: ""; position: absolute; width: 10px; height: 10px; background: var(--gold); transform: rotate(45deg); box-shadow: 0 0 8px rgba(242,193,78,0.8); }
+.frame::before { left: -5px; top: -5px; }
+.frame::after { right: -5px; bottom: -5px; }
+.vitals { border-radius: 14px 4px 14px 4px; padding: 8px 12px 9px 58px; width: 250px; }
+.vitals.frame { background: linear-gradient(180deg, rgba(20,28,64,0.9), rgba(7,10,28,0.9)); }
+#portrait { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); width: 46px; height: 46px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #cff3ff, var(--slime) 50%, #1e4f9a); box-shadow: 0 0 0 2px #0b1230, 0 0 0 4px var(--gold), 0 0 14px rgba(88,196,255,0.7); overflow: hidden; }
+#portrait::before, #portrait::after { content: ""; position: absolute; top: 44%; width: 5px; height: 9px; border-radius: 50%; background: #0b1020; }
+#portrait::before { left: 15px; } #portrait::after { right: 15px; }
+#lvlBadge { position: absolute; left: 34px; bottom: 2px; z-index: 2; min-width: 26px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--rim); color: #2a1a04; font-weight: 800; font-size: 11px; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.5); font-variant-numeric: tabular-nums; }
+.bar { height: 13px; border-radius: 7px; background: rgba(0,0,0,0.55); box-shadow: inset 0 1px 3px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.08); }
+.bar i { border-radius: 7px; box-shadow: inset 0 2px 0 rgba(255,255,255,0.35), inset 0 -3px 5px rgba(0,0,0,0.25); }
+.bar.hp i { background: linear-gradient(180deg, #ff8a99, #e0283f 55%, #9a1024); }
+.bar.mp i { background: linear-gradient(180deg, #9fd4ff, #2f7ae0 55%, #1a4296); }
+.bar.xp i { background: linear-gradient(90deg, #c8912e, #ffe39a); box-shadow: 0 0 6px rgba(242,193,78,0.8); }
+.bar::after { content: ""; position: absolute; inset: 0; border-radius: 7px; background: repeating-linear-gradient(90deg, transparent 0 19px, rgba(0,0,0,0.25) 19px 20px); pointer-events: none; }
+.bar.xp::after { display: none; }
+.icon-btn { border-radius: 50%; width: 46px; height: 46px; background: radial-gradient(circle at 40% 30%, #26336e, #0a0f28 70%); border: 2px solid var(--gold); box-shadow: 0 0 10px rgba(242,193,78,0.4); }
+.quest { border-radius: 4px 14px 4px 14px; background: linear-gradient(90deg, rgba(40,26,6,0.78), rgba(9,14,36,0.55)); border: 1px solid rgba(242,193,78,0.5); border-left: 3px double var(--gold); top: calc(118px + var(--st)); }
+#minimap { border: 3px solid transparent; background: linear-gradient(#0c1330,#0c1330) padding-box, var(--rim) border-box; box-shadow: 0 0 16px rgba(242,193,78,0.35), 0 6px 18px rgba(0,0,0,0.5); }
+#clock { border: 1px solid rgba(242,193,78,0.5); }
+.sage { background: linear-gradient(180deg, rgba(3,26,34,0.92), rgba(2,14,22,0.92)); border: 1px solid rgba(159,243,232,0.8); outline: 1px solid rgba(159,243,232,0.25); outline-offset: 4px; box-shadow: 0 0 24px rgba(159,243,232,0.25), inset 0 0 20px rgba(159,243,232,0.08); border-radius: 2px; }
+.sage::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(159,243,232,0.05) 0 1px, transparent 1px 3px); pointer-events: none; }
+
+/* Botões de ação: medalhão com anel dourado e ícone */
+.act { background: radial-gradient(circle at 40% 30%, #22306a, #070b20 72%); border: none; box-shadow: 0 0 0 3px #0a0f25, 0 0 0 5px #c8912e, 0 0 0 6px #ffe39a55, 0 6px 16px rgba(0,0,0,0.55); overflow: hidden; }
+.act .ico { position: absolute; inset: 0; border-radius: 50%; background-repeat: no-repeat; background-size: 300% 300%; opacity: 0; transition: opacity 0.3s; }
+body.has-icons .act .ico { opacity: 1; }
+.act .lbl { position: relative; z-index: 2; font-size: 10px; letter-spacing: 0.08em; text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+body.has-icons .act .lbl { position: absolute; left: 0; right: 0; bottom: 6px; font-size: 8.5px; }
+body.has-icons .act.big .lbl { bottom: 9px; font-size: 10px; }
+.act.predator .lbl { font-size: 8px; letter-spacing: 0.02em; }
+.act.big { background: radial-gradient(circle at 40% 30%, #6a1f2e, #1a0610 72%); }
+.act.predator { background: radial-gradient(circle at 40% 30%, #4a2a8a, #12082a 72%); }
+.act.predator.ready { box-shadow: 0 0 0 3px #0a0f25, 0 0 0 5px var(--sage), 0 0 24px rgba(159,243,232,0.8); }
+.act.skill { box-shadow: 0 0 0 3px #0a0f25, 0 0 0 4px #8fb8e8, 0 6px 14px rgba(0,0,0,0.5); }
+.act.skill .cd { z-index: 3; }
+.act.small { border-radius: 22px; box-shadow: 0 0 0 2px #0a0f25, 0 0 0 3px #c8912e, 0 4px 10px rgba(0,0,0,0.5); }
+.act.talk { box-shadow: 0 0 0 2px #0a0f25, 0 0 0 3px var(--gold), 0 0 16px rgba(242,193,78,0.5); }
+#stick { border: 3px solid transparent; background: radial-gradient(circle, rgba(9,14,36,0.25), rgba(9,14,36,0.5)) padding-box, var(--rim) border-box; opacity: 0.85; }
+#knob { background: radial-gradient(circle at 40% 30%, #cff3ff, var(--slime) 55%, #1e4f9a); border: 2px solid var(--gold2); box-shadow: 0 0 14px rgba(88,196,255,0.8); }
+.panel { background: linear-gradient(180deg, #131b44, #070b20); border: 2px solid transparent; background-clip: padding-box; box-shadow: 0 0 0 1px #c8912e, 0 0 0 3px #0a0f25, 0 0 0 4px #ffe39a66, 0 24px 60px rgba(0,0,0,0.7); }
+.panel-head h2 { color: var(--gold2); letter-spacing: 0.08em; text-shadow: 0 0 12px rgba(242,193,78,0.5); }
+#menuTabs button.on { background: linear-gradient(180deg, rgba(242,193,78,0.25), rgba(242,193,78,0.05)); border-color: var(--gold); color: var(--gold2); }
+.skills li .sk-ico { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 10px; background-size: 300% 300%; box-shadow: 0 0 0 2px #c8912e; }
+.skills li { gap: 12px; }
+.skills li > div:first-of-type { flex: 1; }
+#title { background: radial-gradient(ellipse at center, rgba(7,11,30,0.15), rgba(7,11,30,0.8)); }
+#title.art { background: linear-gradient(180deg, rgba(7,11,30,0.1), rgba(7,11,30,0.75)), var(--title-art) center / cover no-repeat; }
+.dialog { border-radius: 4px 18px 4px 18px; }
+#dlgWho { color: var(--gold2); text-shadow: 0 0 10px rgba(242,193,78,0.5); }
+
 @media (prefers-reduced-motion: reduce) {
   .slime-dot, .act.predator.ready, .act.evolve { animation: none; }
   .region-toast.show { animation-duration: 0.01s; opacity: 0; }
@@ -257,7 +312,7 @@ input { font-family: var(--ui); font-size: 16px; color: var(--ink); background: 
 <div id="hud" hidden>
   <div class="hud-top">
     <button class="icon-btn" data-act="menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-    <div class="vitals">
+    <div class="vitals frame"><div id="portrait"></div><span id="lvlBadge">1</span>
       <div class="who"><span id="pName">Slime</span><span id="pForm" class="form-tag">Slime</span><span id="pLvl">Nv 1</span></div>
       <div class="bar hp"><i id="hpFill"></i><span id="hpTxt"></span></div>
       <div class="bar mp"><i id="mpFill"></i><span id="mpTxt"></span></div>

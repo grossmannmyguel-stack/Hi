@@ -17,11 +17,13 @@ export class UI {
     this.textTick = 0;
     this.v3 = new THREE.Vector3();
     this.mapBig = false;
+    this.hotbarShown = [];
     this.mini = $('minimap');
     this.miniCtx = this.mini.getContext('2d');
     this.dialogState = null;
     this.menuTab = 'status';
 
+    this.setupIcons();
     $('minimap').addEventListener('click', () => { this.mapBig = !this.mapBig; $('mapWrap').classList.toggle('big', this.mapBig); sfx.ui(); });
     $('menuClose').addEventListener('click', () => this.closeMenu());
     document.querySelectorAll('#menuTabs button').forEach((b) => b.addEventListener('click', () => { this.menuTab = b.dataset.tab; this.renderMenu(); sfx.ui(); }));
@@ -36,6 +38,48 @@ export class UI {
       this.g.nameGoblin(i, input.value);
       this.renderNaming();
     });
+  }
+
+  // ------------------------------------------------ Ícones (folhas 3x3 geradas no Canva)
+  setupIcons() {
+    const pos = (i) => `${(i % 3) * 50}% ${Math.floor(i / 3) * 50}%`;
+    const ACT = { atacar: 0, pular: 1, predador: 2, pocao: 3, forma: 4, falar: 5, evoluir: 6, menu: 7 };
+    document.querySelectorAll('.act[data-act]').forEach((b) => {
+      const act = b.dataset.act;
+      if (act.startsWith('skill')) return;
+      const label = b.childNodes[0] && b.childNodes[0].nodeType === 3 ? b.childNodes[0].textContent : '';
+      if (b.childNodes[0] && b.childNodes[0].nodeType === 3) b.childNodes[0].remove();
+      const lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = label;
+      b.prepend(lbl);
+      if (ACT[act] !== undefined && !b.classList.contains('small') && !b.classList.contains('talk') && !b.classList.contains('evolve')) {
+        const ico = document.createElement('i');
+        ico.className = 'ico';
+        ico.style.backgroundImage = 'url(ui/icones-acoes.jpg)';
+        ico.style.backgroundPosition = pos(ACT[act]);
+        b.prepend(ico);
+      }
+    });
+    for (let i = 0; i < 3; i++) {
+      const b = $('sk' + i);
+      const ico = document.createElement('i');
+      ico.className = 'ico';
+      b.prepend(ico);
+      b.querySelector('span').className = 'lbl';
+    }
+    this.skillPos = pos;
+    const probe = new Image();
+    probe.onload = () => document.body.classList.add('has-icons');
+    probe.src = 'ui/icones-habilidades.jpg';
+    const art = new Image();
+    art.onload = () => { $('title').style.setProperty('--title-art', 'url(ui/titulo.jpg)'); $('title').classList.add('art'); };
+    art.src = 'ui/titulo.jpg';
+  }
+
+  skillIcon(id) {
+    const IDX = { laminaAgua: 0, fioAco: 1, venenoCorrosivo: 2, chamaNegra: 3, predador: 4, faro: 5, mimetismoLobo: 5, asas: 6, peleBlindada: 7, forcaBruta: 8, protecaoDragao: 7, sabio: 4, mimetismoHumano: 4 };
+    return IDX[id] === undefined ? null : `background-image:url(ui/icones-habilidades.jpg);background-position:${this.skillPos(IDX[id])}`;
   }
 
   // ------------------------------------------------ Grande Sábio
@@ -153,6 +197,8 @@ export class UI {
     $('pName').textContent = p.name;
     $('pForm').textContent = p.form === 'slime' ? STAGES[p.stage].nome : p.form === 'lobo' ? 'Forma de Lobo' : 'Forma Humana';
     $('pLvl').textContent = 'Nv ' + p.level;
+    $('lvlBadge').textContent = p.level;
+    $('portrait').style.background = `radial-gradient(circle at 40% 35%, #ffffffcc, #${STAGES[p.stage].cor.toString(16).padStart(6, '0')} 50%, #0b1a44)`;
     $('hpTxt').textContent = `${Math.ceil(p.hp)} / ${p.stats.hpMax}`;
     $('mpTxt').textContent = `${Math.floor(p.mp)} / ${p.stats.mpMax}`;
     $('clock').textContent = g.world.hourLabel + (g.world.isNight ? ' · noite' : '');
@@ -168,7 +214,11 @@ export class UI {
     $('qProg').textContent = prog;
     for (let i = 0; i < 3; i++) {
       const id = p.hotbar[i];
-      if (id) $('sk' + i).querySelector('span').textContent = SKILLS[id].nome;
+      if (id && this.hotbarShown[i] !== id) {
+        this.hotbarShown[i] = id;
+        $('sk' + i).querySelector('.lbl').textContent = SKILLS[id].nome;
+        $('sk' + i).querySelector('.ico').style.cssText = this.skillIcon(id) || '';
+      }
     }
     $('potionN').textContent = p.potions;
     $('btnPotion').classList.toggle('empty', p.potions === 0);
@@ -352,7 +402,8 @@ export class UI {
         h += `<h4>${title}</h4><ul class="skills">`;
         for (const id of list) {
           const s = SKILLS[id];
-          h += `<li><div><b>${s.nome}</b>${s.mp ? `<span class="cost">${s.mp} PM</span>` : ''}<p>${s.desc}</p></div>`;
+          const icoCss = this.skillIcon(id);
+          h += `<li>${icoCss ? `<span class="sk-ico" style="${icoCss}"></span>` : ''}<div><b>${s.nome}</b>${s.mp ? `<span class="cost">${s.mp} PM</span>` : ''}<p>${s.desc}</p></div>`;
           if (type === 'ativa') {
             h += '<div class="slots">' + [0, 1, 2].map((i) => `<button data-slot="${i}" data-skill="${id}" class="${p.hotbar[i] === id ? 'on' : ''}">${i + 1}</button>`).join('') + '</div>';
           }

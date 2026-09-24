@@ -77,11 +77,18 @@ for (const [id, e] of Object.entries(manifest)) {
   if (!fs.existsSync(path.join(root, 'jogo/modelos', e.arquivo))) { delete manifest[id]; continue; }
   e.arquivo = convert(e.arquivo);
   if (e.correr) e.correr = convert(e.correr);
+  for (const k of Object.keys(e.anims || {})) e.anims[k] = convert(e.anims[k]);
 }
 fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2));
+// Imagens da interface (ícones e arte do Canva), se existirem.
+const UI_SRC = path.join(root, 'jogo/ui');
+const UI_OUT = path.join(root, 'dist/ui');
+fs.rmSync(UI_OUT, { recursive: true, force: true });
+if (fs.existsSync(UI_SRC)) { fs.mkdirSync(UI_OUT, { recursive: true }); for (const f of fs.readdirSync(UI_SRC)) fs.copyFileSync(path.join(UI_SRC, f), path.join(UI_OUT, f)); }
 const files = {};
 let total = out.length;
 for (const f of fs.readdirSync(OUT)) { files['modelos/' + f] = path.join(OUT, f); total += fs.statSync(path.join(OUT, f)).size; }
+if (fs.existsSync(UI_OUT)) for (const f of fs.readdirSync(UI_OUT)) { files['ui/' + f] = path.join(UI_OUT, f); total += fs.statSync(path.join(UI_OUT, f)).size; }
 fs.writeFileSync(path.join(root, 'dist/arquivos.json'), JSON.stringify(files, null, 2));
 fs.writeFileSync(path.join(root, 'dist/texturas.json'), JSON.stringify(images.sort((a, b) => b.size - a.size), null, 2));
 console.log(`total publicado: ${(total / 1048576).toFixed(1)} MB em ${Object.keys(files).length + 1} arquivos; ${Object.keys(assetMap).length} texturas no armazenamento`);

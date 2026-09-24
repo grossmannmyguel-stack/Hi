@@ -139,6 +139,27 @@
       "altura": 4.8,
       "poligonos": 6000,
       "prompt": "small wooden fantasy village house for goblins, log walls, red tiled roof, wooden door and windows, game asset"
+    },
+    {
+      "id": "entradaGruta",
+      "prioridade": 3,
+      "altura": 18,
+      "poligonos": 30000,
+      "prompt": "massive rocky mountain cliff with a big dark arched cave entrance in the middle, glowing purple and cyan crystals growing out of the rocks, moss and small plants, epic fantasy game environment asset"
+    },
+    {
+      "id": "ruinas",
+      "prioridade": 3,
+      "altura": 13,
+      "poligonos": 30000,
+      "prompt": "ancient overgrown stone temple ruins, broken columns, crumbling arches, wide stone stairs, vines and moss, magic runes, epic fantasy game environment asset"
+    },
+    {
+      "id": "torre",
+      "prioridade": 3,
+      "altura": 12,
+      "poligonos": 20000,
+      "prompt": "tall wooden goblin watchtower on stilts with a thatched roof lookout platform, rope ladder, torn banners, spiked wooden palisade at the base, fantasy game environment asset"
     }
   ]
 }

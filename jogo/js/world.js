@@ -11,6 +11,8 @@ const CELL = (HALF * 2) / SEG;
 const N = SEG + 1;
 const REG = Object.fromEntries(REGIONS.map((r) => [r.id, r]));
 const noise = makeNoise(7);
+// Áreas sem árvores em volta das construções do Meshy (ruínas e torres).
+const CLEARINGS = [[-32, 92, 16], [150, 20, 16], [58, -140, 8]];
 
 const PATHS = [
   [[0, 132], [-20, 60], [-60, 10], [-95, -30]],
@@ -90,6 +92,7 @@ export class World {
     this.buildSky();
     this.buildVegetation();
     this.buildPlaces();
+    this.buildLandmarks();
     this.buildLights();
     this.buildMinimapImage();
   }
@@ -335,6 +338,7 @@ export class World {
 
   treeDensity(x, z, h) {
     if (h < 0.9 || h > 31) return 0;
+    for (const [lx, lz, lr] of CLEARINGS) if (Math.hypot(x - lx, z - lz) < lr) return 0;
     const g = grutaInfo(x, z);
     if (g.d < 62) return 0;
     for (const id of ['vila', 'acampamento']) if (Math.hypot(x - REG[id].x, z - REG[id].z) < REG[id].r * 1.05) return 0;
@@ -494,6 +498,41 @@ export class World {
     f2.root.scale.setScalar(1.6);
     this.scene.add(f2.root);
     this.animated.push(f2);
+  }
+
+  // Construções grandes feitas no Meshy, com colisão aproximada pelas bordas.
+  placeLandmark(id, x, z, rotY, { sink = 0.3, solid = 'bordas' } = {}) {
+    const m = makeCustom(id);
+    if (!m) return null;
+    m.root.position.set(x, this.heightAt(x, z) - sink, z);
+    m.root.rotation.y = rotY;
+    m.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    this.scene.add(m.root);
+    m.root.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(m.root);
+    const w = b.max.x - b.min.x, d = b.max.z - b.min.z;
+    if (solid === 'redondo') this.addCollider(x, z, Math.min(w, d) * 0.3);
+    else if (solid === 'bordas') {
+      // Paredes laterais (o meio fica livre para passar).
+      const c = Math.cos(rotY), sn = Math.sin(rotY), hw = Math.abs(c) > 0.7 ? w / 2 : d / 2, hd = Math.abs(c) > 0.7 ? d / 2 : w / 2;
+      for (const side of [-1, 1]) {
+        for (let t = -1; t <= 1; t += 0.5) {
+          const lx = side * hw * 0.8, lz = t * hd * 0.8;
+          this.addCollider(x + lx * c + lz * sn, z - lx * sn + lz * c, hw * 0.22);
+        }
+      }
+    }
+    return m;
+  }
+
+  buildLandmarks() {
+    const G = REG.gruta, V = REG.vila;
+    this.placeLandmark('entradaGruta', G.x, G.z - 33, 0, { sink: 0.8 });
+    this.placeLandmark('ruinas', -32, 92, 0.4, { sink: 0.5 });
+    this.placeLandmark('ruinas', 150, 20, -1.2, { sink: 0.5 });
+    this.placeLandmark('torre', V.x + 20, V.z + 12, -0.8, { sink: 0.2, solid: 'redondo' });
+    this.placeLandmark('torre', V.x + 17, V.z - 16, -2.2, { sink: 0.2, solid: 'redondo' });
+    this.placeLandmark('torre', 58, -140, 2.4, { sink: 0.2, solid: 'redondo' });
   }
 
   setVillageLevel(level) {

@@ -647,7 +647,11 @@ export async function preloadCustom(onProgress) {
       e._gltf = await loadFile(e.arquivo);
       fixMaterials(e._gltf.scene);
       if (e.correr) e._run = (await loadFile(e.correr)).animations;
-      [...e._gltf.animations, ...(e._run || [])].forEach(lockRootMotion);
+      e._anims = {};
+      for (const [k, f] of Object.entries(e.anims || {})) {
+        try { e._anims[k] = (await loadFile(f)).animations[0]; } catch (err) { console.warn('animação', id, k, err); }
+      }
+      [...e._gltf.animations, ...(e._run || []), ...Object.values(e._anims).filter(Boolean)].forEach(lockRootMotion);
     } catch (err) {
       console.warn('modelo', id, err);
       e._gltf = null;
@@ -706,34 +710,46 @@ export function makeCustom(id) {
     }
     if (o.isBone && !arm && /right.?arm$|RightArm/i.test(o.name) && !/fore/i.test(o.name)) arm = o;
   });
-  let mixer = null, walk = null, run = null, cur = null;
+  let mixer = null, cur = null;
+  const act = {};
+  const A = entry._anims || {};
   if (gltf.animations.length) {
     mixer = new THREE.AnimationMixer(scene);
-    walk = mixer.clipAction(gltf.animations[0]);
-    if (entry._run && entry._run.length) run = mixer.clipAction(entry._run[0]);
-    walk.play();
-    cur = walk;
+    act.walk = mixer.clipAction(gltf.animations[0]);
+    if (entry._run && entry._run.length) act.run = mixer.clipAction(entry._run[0]);
+    if (A.parado) act.idle = mixer.clipAction(A.parado);
+    if (A.atacar) { act.attack = mixer.clipAction(A.atacar); act.attack.setLoop(THREE.LoopOnce); act.attack.clampWhenFinished = true; }
+    if (A.morrer) { act.death = mixer.clipAction(A.morrer); act.death.setLoop(THREE.LoopOnce); act.death.clampWhenFinished = true; }
+    cur = act.idle || act.walk;
+    cur.play();
   }
-  const to = (a) => {
+  const to = (a, fade = 0.25) => {
     if (!a || a === cur) return;
     a.reset().play();
-    a.crossFadeFrom(cur, 0.25, false);
+    a.crossFadeFrom(cur, fade, false);
     cur = a;
   };
   let phase = 0;
   function anim(dt, s) {
     if (mixer) {
-      if (s.moving) {
-        const fast = run && s.speed > 4.2;
-        to(fast ? run : walk);
+      if (s.dead && act.death) {
+        to(act.death, 0.15);
+      } else if (s.attack >= 0 && act.attack) {
+        if (cur !== act.attack) { to(act.attack, 0.1); act.attack.timeScale = act.attack.getClip().duration / 0.75; }
+      } else if (s.moving) {
+        const fast = act.run && s.speed > 4.2;
+        to(fast ? act.run : act.walk);
         cur.timeScale = fast ? Math.max(0.7, s.speed / 6) : Math.max(0.6, s.speed / 2.5);
+      } else if (act.idle) {
+        to(act.idle, 0.3);
+        act.idle.timeScale = 1;
       } else {
-        to(walk);
-        walk.timeScale = 0;
-        walk.time = 0;
+        to(act.walk);
+        act.walk.timeScale = 0;
+        act.walk.time = 0;
       }
       mixer.update(dt);
-      if (arm && s.attack >= 0) {
+      if (arm && s.attack >= 0 && !act.attack) {
         const a = s.attack;
         arm.rotation.x += a < 0.35 ? -2.2 * (a / 0.35) : -2.2 + 2.2 * ((a - 0.35) / 0.65);
       }
@@ -751,5 +767,5 @@ export function makeCustom(id) {
     const lunge = s.attack >= 0 ? Math.sin(s.attack * Math.PI) : 0;
     inner.position.z = lunge * 0.3 * hgt;
   }
-  return { root, mats, anim, height: hgt };
+  return { root, mats, anim, height: hgt, hasDeath: !!act.death };
 }
