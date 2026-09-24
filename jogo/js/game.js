@@ -25,7 +25,7 @@ export class Game {
     this.camera = camera;
     this.input = input;
     this.t = 0;
-    this.settings = { quality: 'media', mute: false, ...(storage(() => JSON.parse(localStorage.getItem(CFG_KEY))) || {}) };
+    this.settings = { quality: 'alta', mute: false, ...(storage(() => JSON.parse(localStorage.getItem(CFG_KEY))) || {}) };
     setMuted(this.settings.mute);
     this.world = new World(scene);
     this.ui = new UI(this);
@@ -133,13 +133,19 @@ export class Game {
   applyQuality() {
     const q = this.settings.quality;
     const dpr = window.devicePixelRatio || 1;
-    this.renderer.setPixelRatio(q === 'baixa' ? 1 : q === 'media' ? Math.min(dpr, 1.5) : Math.min(dpr, 2));
-    this.scene.fog.far = q === 'baixa' ? 120 : q === 'media' ? 170 : 220;
-    this.scene.fog.near = this.scene.fog.far * 0.3;
+    this.renderer.setPixelRatio(q === 'baixa' ? 1 : q === 'media' ? Math.min(dpr, 1.5) : Math.min(dpr, 3));
+    this.scene.fog.far = q === 'baixa' ? 140 : q === 'media' ? 200 : 280;
+    this.scene.fog.near = this.scene.fog.far * 0.35;
     this.camera.far = this.scene.fog.far + 200;
     this.camera.updateProjectionMatrix();
-    this.activeRange = this.scene.fog.far * 0.8;
-    this.viewRange = q === 'baixa' ? 70 : q === 'media' ? 95 : 130;
+    this.activeRange = Math.max(120, this.scene.fog.far * 0.7);
+    this.viewRange = q === 'baixa' ? 80 : q === 'media' ? 120 : 180;
+    this.world.lodDist = q === 'baixa' ? 60 : q === 'media' ? 90 : 130;
+    this.renderer.shadowMap.enabled = q !== 'baixa';
+    this.world.sun.castShadow = q !== 'baixa';
+    this.world.sun.shadow.mapSize.setScalar(q === 'alta' ? 4096 : 2048);
+    if (this.world.sun.shadow.map) { this.world.sun.shadow.map.dispose(); this.world.sun.shadow.map = null; }
+    this.world.enableGrass(q !== 'baixa');
   }
 
   setMute(m) {
@@ -172,6 +178,7 @@ export class Game {
   }
 
   prepModel(model) {
+    model.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     for (const m of model.mats) {
       if (m.emissive) { m.userData.e0 = m.emissive.getHex(); m.userData.ei0 = m.emissiveIntensity; }
       if (m.color) m.userData.c0 = m.color.getHex();

@@ -21,12 +21,14 @@
   },
   "hobgoblin": {
     "arquivo": "hobgoblin.glb",
-    "altura": 1.75,
+    "altura": 2.3,
+    "correr": "hobgoblin_correr.glb",
     "tarefa": "01a0d15b-d653-752f-ac41-74bc9c99d96e"
   },
   "goblin": {
     "arquivo": "goblin.glb",
-    "altura": 1.1,
+    "altura": 1.6,
+    "correr": "goblin_correr.glb",
     "tarefa": "01a0d15d-4b7c-74e1-81e4-a3c52ebe25dc"
   },
   "morcego": {
@@ -48,5 +50,43 @@
     "arquivo": "cabana.glb",
     "altura": 4.2,
     "tarefa": "01a0d163-4a61-702e-a4f6-6796c9ca5354"
+  },
+  "humano": {
+    "arquivo": "humano.glb",
+    "altura": 1.75,
+    "correr": "humano_correr.glb",
+    "tarefa": "01a0d16d-dec7-7258-95a1-ef0d784d619a"
+  },
+  "arvore": {
+    "arquivo": "arvore.glb",
+    "altura": 6.5,
+    "tarefa": "01a0d16f-2402-7269-8a09-06ccfe7cd66f"
+  },
+  "casa": {
+    "arquivo": "casa.glb",
+    "altura": 4.8,
+    "tarefa": "01a0d170-48ad-7041-a2eb-9fd8bbcdf2b6"
+  },
+  "ogroChefe": {
+    "arquivo": "ogroChefe.glb",
+    "altura": 4.6,
+    "correr": "ogroChefe_correr.glb",
+    "tarefa": "01a0d16d-f595-7077-8ba3-9e17135fb92a"
+  },
+  "loboAlfa": {
+    "arquivo": "loboAlfa.glb",
+    "altura": 2.9,
+    "tarefa": "01a0d170-e30e-7231-a192-4a0eeb6a87ad"
+  },
+  "lagarto": {
+    "arquivo": "lagarto.glb",
+    "altura": 1.4,
+    "tarefa": "01a0d172-53df-7610-aaae-54a9707547eb"
+  },
+  "ogro": {
+    "arquivo": "ogro.glb",
+    "altura": 3.4,
+    "correr": "ogro_correr.glb",
+    "tarefa": "01a0d172-33a0-773c-b51d-c83f2bf1375e"
   }
 }

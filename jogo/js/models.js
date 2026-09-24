@@ -2,7 +2,9 @@
 // { root, mats, anim(dt, estado) }. Quando houver modelos do Meshy em
 // modelos/manifest.json, eles substituem estes automaticamente.
 import * as THREE from 'three';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { STAGES } from './data.js';
+import { makeRigged } from './autorig.js';
 
 const geoCache = new Map();
 function geo(key, make) {
@@ -580,10 +582,9 @@ export function makeShadow(size = 1) {
 }
 
 // ---------------------------------------------------------------- Modelos do Meshy (GLB)
-// modelos/manifest.json: { "lobo": { "arquivo": "lobo.glb", "altura": 2 }, ... }
+// modelos/manifest.json: { "lobo": { "arquivo": "lobo.glb", "altura": 2, "correr": "x_correr.glb" }, ... }
 let manifest = null;
 let loaderPromise = null;
-const gltfCache = new Map();
 
 export async function loadManifest() {
   try {
@@ -595,33 +596,67 @@ export async function loadManifest() {
   return manifest;
 }
 
-export function hasCustom(id) { return !!(manifest && manifest[id]); }
+export function hasCustom(id) { return !!(manifest && manifest[id] && manifest[id]._gltf); }
 
-async function loadGLTF(id) {
-  if (!hasCustom(id)) return null;
-  if (!gltfCache.has(id)) {
-    if (!loaderPromise) loaderPromise = import('three/addons/loaders/GLTFLoader.js').then((m) => new m.GLTFLoader());
-    const file = 'modelos/' + manifest[id].arquivo;
-    gltfCache.set(id, loaderPromise.then(async (loader) => {
-      // Na versão publicada no claude.ai os GLB vão em base64 dentro de um .txt.
-      if (!file.endsWith('.txt')) return loader.loadAsync(file);
-      const b64 = await (await fetch(file)).text();
-      const bin = atob(b64.trim());
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      return loader.parseAsync(bytes.buffer, 'modelos/');
-    }).catch((e) => { console.warn('modelo', id, e); return null; }));
+async function loadFile(name) {
+  if (!loaderPromise) loaderPromise = import('three/addons/loaders/GLTFLoader.js').then((m) => new m.GLTFLoader());
+  const loader = await loaderPromise;
+  const file = 'modelos/' + name;
+  // Na versão publicada no claude.ai os GLB vão em base64 dentro de um .txt.
+  if (!file.endsWith('.txt')) return loader.loadAsync(file);
+  const b64 = await (await fetch(file)).text();
+  const bin = atob(b64.trim());
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return loader.parseAsync(bytes.buffer, new URL('modelos/', document.baseURI).href);
+}
+
+// Meshy sem PBR: garante material fosco com a textura de cor (senão alguns aparelhos mostram cinza/escuro).
+function fixMaterials(scene) {
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const ms = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of ms) {
+      if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+      if ('metalness' in m) { m.metalness = 0; m.roughness = Math.max(0.6, m.roughness ?? 1); }
+      if (m.map && m.color) m.color.set(0xffffff);
+    }
+    o.castShadow = true;
+    o.receiveShadow = true;
+  });
+}
+
+// As animações do Meshy andam para frente sozinhas; o jogo já move o personagem, então
+// o quadril fica parado em x/z (mantém só o sobe e desce).
+function lockRootMotion(clip) {
+  for (const tr of clip.tracks) {
+    if (!/hips.*\.position$|root.*\.position$/i.test(tr.name)) continue;
+    const v = tr.values;
+    for (let i = 0; i < v.length; i += 3) { v[i] = v[0]; v[i + 2] = v[2]; }
   }
-  return gltfCache.get(id);
 }
 
-// Pré-carrega os GLBs que existirem, para que makeCustom funcione de forma síncrona depois.
-export async function preloadCustom() {
+// Carrega todos os modelos do manifest antes do jogo começar. onProgress(feitos, total).
+export async function preloadCustom(onProgress) {
   if (!manifest) await loadManifest();
-  await Promise.all(Object.keys(manifest).map((id) => loadGLTF(id).then((g) => { if (g) gltfCache.set(id, Promise.resolve(g)); manifest[id]._gltf = g; })));
+  const ids = Object.keys(manifest);
+  let done = 0;
+  await Promise.all(ids.map(async (id) => {
+    const e = manifest[id];
+    try {
+      e._gltf = await loadFile(e.arquivo);
+      fixMaterials(e._gltf.scene);
+      if (e.correr) e._run = (await loadFile(e.correr)).animations;
+      [...e._gltf.animations, ...(e._run || [])].forEach(lockRootMotion);
+    } catch (err) {
+      console.warn('modelo', id, err);
+      e._gltf = null;
+    }
+    onProgress?.(++done, ids.length);
+  }));
 }
 
-// Peças (geometria + material) de um GLB, já na escala do jogo, para usar em InstancedMesh.
+// Peças (geometria + material) de um GLB, já na escala do jogo (base em y=0, centro em x/z).
 export function customParts(id) {
   const entry = manifest && manifest[id];
   if (!entry || !entry._gltf) return null;
@@ -634,7 +669,7 @@ export function customParts(id) {
     .multiply(new THREE.Matrix4().makeTranslation(-(bb.min.x + size.x / 2), -bb.min.y, -(bb.min.z + size.z / 2)));
   const parts = [];
   scene.traverse((o) => {
-    if (!o.isMesh) return;
+    if (!o.isMesh || o.isSkinnedMesh) return;
     const g = o.geometry.clone();
     g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(norm, o.matrixWorld));
     parts.push({ geometry: g, material: o.material });
@@ -645,53 +680,73 @@ export function customParts(id) {
 export function makeCustom(id) {
   const entry = manifest && manifest[id];
   if (!entry || !entry._gltf) return null;
+  const rigged = makeRigged(id, () => customParts(id), entry.altura || 1.5);
+  if (rigged) return rigged;
   const gltf = entry._gltf;
-  const scene = gltf.scene.clone(true);
+  const scene = SkeletonUtils.clone(gltf.scene);
   const root = new THREE.Group();
   const inner = new THREE.Group();
   root.add(inner);
   inner.add(scene);
-  const bb = new THREE.Box3().setFromObject(scene);
+  scene.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(scene, true);
   const size = bb.getSize(new THREE.Vector3());
   const hgt = entry.altura || 1.5;
   const sc = hgt / Math.max(0.001, size.y);
-  scene.scale.setScalar(sc);
+  scene.scale.multiplyScalar(sc);
   scene.position.set(-(bb.min.x + size.x / 2) * sc, -bb.min.y * sc, -(bb.min.z + size.z / 2) * sc);
   if (entry.girar) scene.rotation.y = entry.girar;
   const mats = [];
+  let arm = null;
   scene.traverse((o) => {
     if (o.isMesh) {
       o.material = o.material.clone();
       mats.push(o.material);
+      if (o.isSkinnedMesh) o.frustumCulled = false;
     }
+    if (o.isBone && !arm && /right.?arm$|RightArm/i.test(o.name) && !/fore/i.test(o.name)) arm = o;
   });
-  let mixer = null, walk = null, idle = null;
-  if (gltf.animations && gltf.animations.length) {
+  let mixer = null, walk = null, run = null, cur = null;
+  if (gltf.animations.length) {
     mixer = new THREE.AnimationMixer(scene);
-    const find = (re) => gltf.animations.find((a) => re.test(a.name));
-    const w = find(/walk|run|andar/i) || gltf.animations[0];
-    const i = find(/idle|parado/i);
-    walk = mixer.clipAction(w);
-    if (i) idle = mixer.clipAction(i);
-    (idle || walk).play();
+    walk = mixer.clipAction(gltf.animations[0]);
+    if (entry._run && entry._run.length) run = mixer.clipAction(entry._run[0]);
+    walk.play();
+    cur = walk;
   }
-  let phase = 0, wasMoving = false;
+  const to = (a) => {
+    if (!a || a === cur) return;
+    a.reset().play();
+    a.crossFadeFrom(cur, 0.25, false);
+    cur = a;
+  };
+  let phase = 0;
   function anim(dt, s) {
     if (mixer) {
-      if (s.moving !== wasMoving && idle) {
-        (s.moving ? idle : walk).fadeOut(0.2);
-        (s.moving ? walk : idle).reset().fadeIn(0.2).play();
+      if (s.moving) {
+        const fast = run && s.speed > 4.2;
+        to(fast ? run : walk);
+        cur.timeScale = fast ? Math.max(0.7, s.speed / 6) : Math.max(0.6, s.speed / 2.5);
+      } else {
+        to(walk);
+        walk.timeScale = 0;
+        walk.time = 0;
       }
-      wasMoving = s.moving;
-      mixer.update(dt * (s.moving || !idle ? Math.max(0.6, s.speed / 4) : 1));
-    } else if (s.moving) {
+      mixer.update(dt);
+      if (arm && s.attack >= 0) {
+        const a = s.attack;
+        arm.rotation.x += a < 0.35 ? -2.2 * (a / 0.35) : -2.2 + 2.2 * ((a - 0.35) / 0.65);
+      }
+      return;
+    }
+    if (s.moving) {
       phase += dt * (5 + s.speed * 0.6);
-      inner.position.y = Math.abs(Math.sin(phase)) * 0.12 * hgt;
-      inner.rotation.z = Math.sin(phase) * 0.06;
+      inner.position.y = Math.abs(Math.sin(phase)) * 0.08 * hgt;
+      inner.rotation.z = Math.sin(phase) * 0.05;
     } else {
       inner.position.y *= 0.85;
       inner.rotation.z *= 0.85;
-      inner.scale.y = 1 + Math.sin(s.t * 2.5) * 0.02;
+      inner.scale.y = 1 + Math.sin(s.t * 2.5) * 0.015;
     }
     const lunge = s.attack >= 0 ? Math.sin(s.attack * Math.PI) : 0;
     inner.position.z = lunge * 0.3 * hgt;

@@ -12,11 +12,15 @@ async function boot() {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 400);
 
   $('loadingText').textContent = 'Carregando modelos...';
-  await preloadCustom();
+  await preloadCustom((n, t) => { $('loadingText').textContent = `Carregando modelos ${n}/${t}...`; });
   $('loadingText').textContent = 'Gerando o mundo...';
   await new Promise((r) => setTimeout(r, 30));
 

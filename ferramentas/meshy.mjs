@@ -12,7 +12,8 @@
 //   --sem-textura       gera só a prévia (mais barato, modelo sem cor)
 //   --limite N          para antes de gastar mais que N créditos (padrão 150)
 //   --refazer           gera de novo mesmo se o .glb já existir
-//   node ferramentas/meshy.mjs otimizar   (refaz a compressão dos originais, grátis)
+//   node ferramentas/meshy.mjs instalar   (copia os originais para o jogo, grátis)
+//   node ferramentas/meshy.mjs animar goblin --confirmar   (esqueleto + andar/correr, ~5 créditos)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -26,7 +27,7 @@ const RAW_DIR = path.join(ROOT, 'ferramentas/brutos');
 const LIST = JSON.parse(fs.readFileSync(path.join(ROOT, 'ferramentas/meshy-modelos.json'), 'utf8')).modelos;
 const API = 'https://api.meshy.ai/openapi';
 // Estimativas; o script confere o saldo antes e depois para mostrar o gasto real.
-const COST = { preview: 20, refine: 10 };
+const COST = { preview: 20, refine: 10, rig: 5 };
 
 const args = process.argv.slice(2);
 const cmd = args[0];
@@ -110,21 +111,51 @@ async function generate(m, textured) {
   const size = await download(url, raw);
   console.log(`  original: ${(size / 1048576).toFixed(1)} MB`);
   fs.writeFileSync(path.join(RAW_DIR, m.id + '.json'), JSON.stringify(task, null, 2));
-  optimize(m, task.id);
+  if (m.humanoide && textured) {
+    try { spent += await rig(m); } catch (e) { console.error(`  ${m.id}: ${e.message}`); }
+  }
+  install(m, task.id);
   return spent;
 }
 
-// Reduz texturas (webp) para carregar rápido no celular e registra no manifest.
-function optimize(m, taskId) {
-  const raw = path.join(RAW_DIR, m.id + '.glb');
+// Copia o modelo original (sem compressão) para o jogo e registra no manifest.
+// Humanoides com esqueleto usam o GLB de caminhada (malha + animação) e o de corrida (só animação).
+function install(m, taskId) {
+  const rigged = fs.existsSync(path.join(RAW_DIR, m.id + '_andar.glb'));
+  const src = path.join(RAW_DIR, m.id + (rigged ? '_andar.glb' : '.glb'));
   const file = path.join(MODELS_DIR, m.id + '.glb');
-  const bin = path.join(ROOT, 'ferramentas/node_modules/.bin/gltf-transform');
-  const tex = String(m.textura || 1024);
-  execFileSync(bin, ['optimize', raw, file, '--compress', 'false', '--simplify', 'false', '--texture-compress', 'webp', '--texture-size', tex], { stdio: 'ignore' });
+  fs.copyFileSync(src, file);
+  const run = path.join(RAW_DIR, m.id + '_correr.glb');
+  if (rigged && fs.existsSync(run)) fs.copyFileSync(run, path.join(MODELS_DIR, m.id + '_correr.glb'));
   const man = readManifest();
-  man[m.id] = { arquivo: m.id + '.glb', altura: m.altura, ...(m.girar ? { girar: m.girar } : {}), ...(taskId ? { tarefa: taskId } : man[m.id]?.tarefa ? { tarefa: man[m.id].tarefa } : {}) };
+  const old = man[m.id] || {};
+  man[m.id] = {
+    arquivo: m.id + '.glb', altura: m.altura,
+    ...(rigged && fs.existsSync(run) ? { correr: m.id + '_correr.glb' } : {}),
+    ...(m.girar ? { girar: m.girar } : {}),
+    ...(taskId || old.tarefa ? { tarefa: taskId || old.tarefa } : {}),
+  };
   fs.writeFileSync(MANIFEST, JSON.stringify(man, null, 2) + '\n');
-  console.log(`  salvo em jogo/modelos/${m.id}.glb (${(fs.statSync(file).size / 1048576).toFixed(2)} MB)`);
+  console.log(`  salvo em jogo/modelos/${m.id}.glb (${(fs.statSync(file).size / 1048576).toFixed(2)} MB)${rigged ? ' com animação' : ''}`);
+}
+
+// Esqueleto + animações de andar e correr (só funciona com humanoides). ~5 créditos.
+async function rig(m) {
+  const info = JSON.parse(fs.readFileSync(path.join(RAW_DIR, m.id + '.json'), 'utf8'));
+  const r = await api('POST', '/v1/rigging', { input_task_id: info.id, height_meters: m.altura });
+  let t;
+  for (;;) {
+    t = await api('GET', `/v1/rigging/${r.result}`);
+    process.stdout.write(`\r  ${m.id} esqueleto: ${t.status} ${t.progress ?? 0}%   `);
+    if (t.status === 'SUCCEEDED') break;
+    if (['FAILED', 'CANCELED', 'EXPIRED'].includes(t.status)) throw new Error(`esqueleto falhou: ${JSON.stringify(t.task_error)}`);
+    await sleep(5000);
+  }
+  process.stdout.write('\n');
+  const a = t.result.basic_animations;
+  await download(a.walking_glb_url, path.join(RAW_DIR, m.id + '_andar.glb'));
+  await download(a.running_armature_glb_url, path.join(RAW_DIR, m.id + '_correr.glb'));
+  return t.consumed_credits ?? 5;
 }
 
 async function main() {
@@ -133,18 +164,29 @@ async function main() {
     for (const m of LIST) console.log(`${man[m.id] ? '✓' : m.descartado ? '✗' : '·'} [p${m.prioridade}] ${m.id.padEnd(10)} ${m.prompt.slice(0, 70)}...`);
     return;
   }
-  if (cmd === 'otimizar') {
-    // Refaz a otimização a partir dos originais (não gasta créditos).
-    for (const m of LIST) if (!m.descartado && fs.existsSync(path.join(RAW_DIR, m.id + '.glb'))) { console.log(m.id); optimize(m); }
+  if (cmd === 'instalar') {
+    // Copia de novo os originais para o jogo (não gasta créditos).
+    for (const m of LIST) if (!m.descartado && fs.existsSync(path.join(RAW_DIR, m.id + '.glb'))) { console.log(m.id); install(m); }
     return;
   }
   need(KEY, 'Defina MESHY_API_KEY antes (ex.: export MESHY_API_KEY=msy_...).');
   if (cmd === 'saldo') { console.log('Saldo:', await balance(), 'créditos'); return; }
-  need(cmd === 'gerar', 'Use: saldo | listar | gerar <ids...> [--confirmar]');
+  if (cmd === 'animar') {
+    // Esqueleto + animação para modelos humanoides que já existem.
+    const ids = args.slice(1).filter((a) => !a.startsWith('--'));
+    let spent = 0;
+    for (const m of LIST.filter((x) => ids.includes(x.id))) {
+      if (!flag('--confirmar')) { console.log(`${m.id}: ~5 créditos (rode com --confirmar)`); continue; }
+      try { spent += await rig(m); install(m); } catch (e) { console.error(`  ${m.id}: ${e.message}`); }
+    }
+    console.log(`Gasto: ${spent}. Saldo: ${await balance()}.`);
+    return;
+  }
+  need(cmd === 'gerar', 'Use: saldo | listar | instalar | animar <ids> | gerar <ids...> [--confirmar]');
   const textured = !flag('--sem-textura');
   const list = pickModels();
   need(list.length, 'Nada para gerar (os modelos pedidos já existem ou nenhum foi escolhido).');
-  const each = COST.preview + (textured ? COST.refine : 0);
+  const each = COST.preview + (textured ? COST.refine : 0) + (textured && list.some((m) => m.humanoide) ? COST.rig : 0);
   const est = each * list.length;
   const limit = +opt('--limite', 150);
   const bal = await balance();
