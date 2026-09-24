@@ -29,7 +29,18 @@ const out = [
 ].join('\n');
 fs.mkdirSync(path.join(root, 'dist/modelos'), { recursive: true });
 fs.writeFileSync(path.join(root, 'dist/slime-renascido.html'), out);
-for (const f of fs.readdirSync(path.join(root, 'jogo/modelos'))) {
-  fs.copyFileSync(path.join(root, 'jogo/modelos', f), path.join(root, 'dist/modelos', f));
+// O claude.ai não serve .glb, então cada modelo vai em base64 num .txt (o jogo decodifica).
+const manifest = JSON.parse(fs.readFileSync(path.join(root, 'jogo/modelos/manifest.json'), 'utf8'));
+for (const f of fs.readdirSync(path.join(root, 'dist/modelos'))) fs.rmSync(path.join(root, 'dist/modelos', f));
+for (const [id, entry] of Object.entries(manifest)) {
+  const src = path.join(root, 'jogo/modelos', entry.arquivo);
+  if (!fs.existsSync(src)) { delete manifest[id]; continue; }
+  const name = entry.arquivo.replace(/\.glb$/, '.glb.txt');
+  fs.writeFileSync(path.join(root, 'dist/modelos', name), fs.readFileSync(src).toString('base64'));
+  manifest[id] = { ...entry, arquivo: name };
 }
+fs.writeFileSync(path.join(root, 'dist/modelos/manifest.json'), JSON.stringify(manifest, null, 2));
+const files = { 'modelos/manifest.json': 'dist/modelos/manifest.json' };
+for (const e of Object.values(manifest)) files['modelos/' + e.arquivo] = 'dist/modelos/' + e.arquivo;
+fs.writeFileSync(path.join(root, 'dist/arquivos.json'), JSON.stringify(files, null, 2));
 console.log(`dist/slime-renascido.html (${(out.length / 1024).toFixed(0)} KB)`);

@@ -1,1 +1,52 @@
-{}
+{
+  "lobo": {
+    "arquivo": "lobo.glb",
+    "altura": 1.9,
+    "tarefa": "01a0d157-cada-76ed-a415-5f7c5bb81851"
+  },
+  "dragao": {
+    "arquivo": "dragao.glb",
+    "altura": 10,
+    "tarefa": "01a0d15a-2dba-70dc-abdb-56ebd7622974"
+  },
+  "aranha": {
+    "arquivo": "aranha.glb",
+    "altura": 1.4,
+    "tarefa": "01a0d15a-2f02-73c8-879c-30771fffa685"
+  },
+  "serpente": {
+    "arquivo": "serpente.glb",
+    "altura": 1.2,
+    "tarefa": "01a0d15b-be19-72e0-96e5-5b2bc0945656"
+  },
+  "hobgoblin": {
+    "arquivo": "hobgoblin.glb",
+    "altura": 1.75,
+    "tarefa": "01a0d15b-d653-752f-ac41-74bc9c99d96e"
+  },
+  "goblin": {
+    "arquivo": "goblin.glb",
+    "altura": 1.1,
+    "tarefa": "01a0d15d-4b7c-74e1-81e4-a3c52ebe25dc"
+  },
+  "morcego": {
+    "arquivo": "morcego.glb",
+    "altura": 0.9,
+    "tarefa": "01a0d15d-6566-7637-bdfe-445a5d020f92"
+  },
+  "pinheiro": {
+    "arquivo": "pinheiro.glb",
+    "altura": 7.5,
+    "tarefa": "01a0d15e-1b09-775f-874a-0b95fb5e8ae6"
+  },
+  "pedra": {
+    "arquivo": "pedra.glb",
+    "altura": 1.3,
+    "tarefa": "01a0d15f-8d6b-7688-b930-773e9b96d5db"
+  },
+  "cabana": {
+    "arquivo": "cabana.glb",
+    "altura": 4.2,
+    "tarefa": "01a0d163-4a61-702e-a4f6-6796c9ca5354"
+  }
+}

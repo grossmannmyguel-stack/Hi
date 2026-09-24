@@ -12,13 +12,17 @@
 //   --sem-textura       gera só a prévia (mais barato, modelo sem cor)
 //   --limite N          para antes de gastar mais que N créditos (padrão 150)
 //   --refazer           gera de novo mesmo se o .glb já existir
+//   node ferramentas/meshy.mjs otimizar   (refaz a compressão dos originais, grátis)
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODELS_DIR = path.join(ROOT, 'jogo/modelos');
 const MANIFEST = path.join(MODELS_DIR, 'manifest.json');
+// Os arquivos originais do Meshy ficam aqui (fora do git) para poder otimizar de novo sem gastar créditos.
+const RAW_DIR = path.join(ROOT, 'ferramentas/brutos');
 const LIST = JSON.parse(fs.readFileSync(path.join(ROOT, 'ferramentas/meshy-modelos.json'), 'utf8')).modelos;
 const API = 'https://api.meshy.ai/openapi';
 // Estimativas; o script confere o saldo antes e depois para mostrar o gasto real.
@@ -77,7 +81,7 @@ function pickModels() {
   else list = [];
   const missing = ids.filter((id) => !LIST.some((m) => m.id === id));
   need(!missing.length, `Não conheço: ${missing.join(', ')}. Veja "listar".`);
-  if (!flag('--refazer')) list = list.filter((m) => !fs.existsSync(path.join(MODELS_DIR, m.id + '.glb')));
+  if (!flag('--refazer')) list = list.filter((m) => !fs.existsSync(path.join(MODELS_DIR, m.id + '.glb')) && !m.descartado);
   return list;
 }
 
@@ -92,25 +96,46 @@ async function generate(m, textured) {
     target_polycount: m.poligonos || 12000,
     ...(m.humanoide ? { pose_mode: 'a-pose' } : {}),
   });
-  let task = await waitTask(preview.result, 'prévia');
+  let task = await waitTask(preview.result, `${m.id} prévia`);
+  let spent = task.consumed_credits ?? COST.preview;
   if (textured) {
     const refine = await api('POST', '/v2/text-to-3d', { mode: 'refine', preview_task_id: preview.result, enable_pbr: false });
-    task = await waitTask(refine.result, 'textura');
+    task = await waitTask(refine.result, `${m.id} textura`);
+    spent += task.consumed_credits ?? COST.refine;
   }
   const url = task.model_urls && task.model_urls.glb;
   need(url, 'O Meshy não devolveu um .glb');
+  fs.mkdirSync(RAW_DIR, { recursive: true });
+  const raw = path.join(RAW_DIR, m.id + '.glb');
+  const size = await download(url, raw);
+  console.log(`  original: ${(size / 1048576).toFixed(1)} MB`);
+  fs.writeFileSync(path.join(RAW_DIR, m.id + '.json'), JSON.stringify(task, null, 2));
+  optimize(m, task.id);
+  return spent;
+}
+
+// Reduz texturas (webp) para carregar rápido no celular e registra no manifest.
+function optimize(m, taskId) {
+  const raw = path.join(RAW_DIR, m.id + '.glb');
   const file = path.join(MODELS_DIR, m.id + '.glb');
-  const size = await download(url, file);
+  const bin = path.join(ROOT, 'ferramentas/node_modules/.bin/gltf-transform');
+  const tex = String(m.textura || 1024);
+  execFileSync(bin, ['optimize', raw, file, '--compress', 'false', '--simplify', 'false', '--texture-compress', 'webp', '--texture-size', tex], { stdio: 'ignore' });
   const man = readManifest();
-  man[m.id] = { arquivo: m.id + '.glb', altura: m.altura, tarefa: task.id };
+  man[m.id] = { arquivo: m.id + '.glb', altura: m.altura, ...(m.girar ? { girar: m.girar } : {}), ...(taskId ? { tarefa: taskId } : man[m.id]?.tarefa ? { tarefa: man[m.id].tarefa } : {}) };
   fs.writeFileSync(MANIFEST, JSON.stringify(man, null, 2) + '\n');
-  console.log(`  salvo em jogo/modelos/${m.id}.glb (${(size / 1048576).toFixed(1)} MB)`);
+  console.log(`  salvo em jogo/modelos/${m.id}.glb (${(fs.statSync(file).size / 1048576).toFixed(2)} MB)`);
 }
 
 async function main() {
   if (cmd === 'listar') {
     const man = readManifest();
-    for (const m of LIST) console.log(`${man[m.id] ? '✓' : '·'} [p${m.prioridade}] ${m.id.padEnd(10)} ${m.prompt.slice(0, 70)}...`);
+    for (const m of LIST) console.log(`${man[m.id] ? '✓' : m.descartado ? '✗' : '·'} [p${m.prioridade}] ${m.id.padEnd(10)} ${m.prompt.slice(0, 70)}...`);
+    return;
+  }
+  if (cmd === 'otimizar') {
+    // Refaz a otimização a partir dos originais (não gasta créditos).
+    for (const m of LIST) if (!m.descartado && fs.existsSync(path.join(RAW_DIR, m.id + '.glb'))) { console.log(m.id); optimize(m); }
     return;
   }
   need(KEY, 'Defina MESHY_API_KEY antes (ex.: export MESHY_API_KEY=msy_...).');
@@ -128,13 +153,13 @@ async function main() {
   if (!flag('--confirmar')) { console.log('Nada foi gasto. Rode de novo com --confirmar para gerar.'); return; }
   need(est <= limit, `A estimativa passa do limite (${limit}). Gere menos modelos ou aumente --limite.`);
   need(est <= bal, 'Saldo insuficiente para esta lista.');
+  let spent = 0;
   for (const m of list) {
-    const now = await balance();
-    if (bal - now + each > limit) { console.log(`Parando: próximo modelo passaria do limite de ${limit} créditos.`); break; }
-    try { await generate(m, textured); } catch (e) { console.error(`  erro em ${m.id}: ${e.message}`); }
+    if (spent + each > limit) { console.log(`Parando: próximo modelo passaria do limite de ${limit} créditos.`); break; }
+    try { spent += await generate(m, textured); } catch (e) { spent += COST.preview; console.error(`  erro em ${m.id}: ${e.message}`); }
   }
   const end = await balance();
-  console.log(`\nGasto real: ${bal - end} créditos. Saldo restante: ${end}.`);
+  console.log(`\nGasto nesta execução: ${spent} créditos. Saldo restante: ${end}.`);
 }
 
 main().catch((e) => { console.error(e.message); process.exit(1); });

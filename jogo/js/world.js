@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { makeNoise, mulberry32, clamp, lerp, smoothstep } from './util.js';
 import { REGIONS, WATER_Y, PLACES } from './data.js';
-import { makeHut, makeCampfire } from './models.js';
+import { makeHut, makeCampfire, makeCustom, customParts } from './models.js';
 
 export const HALF = 240;
 const SEG = 160;
@@ -248,7 +248,7 @@ export class World {
     if (h < 0.9 || h > 31) return 0;
     const g = grutaInfo(x, z);
     if (g.d < 62) return 0;
-    for (const id of ['vila', 'acampamento']) if (rw(id, 1.05, x, z) > 0) return 0;
+    for (const id of ['vila', 'acampamento']) if (Math.hypot(x - REG[id].x, z - REG[id].z) < REG[id].r * 1.05) return 0;
     if (rw('covil', 0.8, x, z) > 0) return 0.02;
     if (distToPaths(x, z) < 4.5) return 0;
     if (z < -110) return 0.13;
@@ -286,34 +286,62 @@ export class World {
       }
     }
     const dummy = new THREE.Object3D();
+    const tmp = new THREE.Color();
+    this.chunks = [];
+    const CH = 80;
+    // Instâncias agrupadas em blocos de 80 m: a câmera descarta os blocos fora de vista.
+    const scatter = (geometry, material, list, place, color) => {
+      const buckets = new Map();
+      for (const o of list) {
+        const k = `${Math.floor(o.x / CH)},${Math.floor(o.z / CH)}`;
+        if (!buckets.has(k)) buckets.set(k, []);
+        buckets.get(k).push(o);
+      }
+      for (const [k, items] of buckets) {
+        const im = new THREE.InstancedMesh(geometry, material, items.length);
+        items.forEach((o, i) => {
+          place(o);
+          dummy.updateMatrix();
+          im.setMatrixAt(i, dummy.matrix);
+          if (color) im.setColorAt(i, color(o));
+        });
+        im.computeBoundingSphere();
+        const [cx, cz] = k.split(',').map((v) => (+v + 0.5) * CH);
+        this.chunks.push({ mesh: im, x: cx, z: cz });
+        this.scene.add(im);
+      }
+    };
+    const standing = (dy) => (o) => { dummy.position.set(o.x, o.h + dy, o.z); dummy.rotation.set(0, o.r * 6, 0); dummy.scale.setScalar(o.s); };
+    const lambert = () => new THREE.MeshLambertMaterial({ flatShading: true });
     const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 2, 6);
     const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2e, flatShading: true });
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, round.length + pine.length);
-    const crownR = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.6, 0), new THREE.MeshLambertMaterial({ flatShading: true }), round.length);
-    const crownP = new THREE.InstancedMesh(new THREE.ConeGeometry(1.5, 4.2, 7), new THREE.MeshLambertMaterial({ flatShading: true }), pine.length);
-    const tmp = new THREE.Color();
-    let t = 0;
-    round.forEach((o, i) => {
-      dummy.position.set(o.x, o.h + o.s, o.z); dummy.rotation.set(0, o.r * 6, 0); dummy.scale.set(o.s, o.s, o.s); dummy.updateMatrix();
-      trunks.setMatrixAt(t++, dummy.matrix);
-      dummy.position.y = o.h + o.s * 3.2; dummy.scale.set(o.s * 1.1, o.s * (0.9 + o.r * 0.4), o.s * 1.1); dummy.updateMatrix();
-      crownR.setMatrixAt(i, dummy.matrix);
-      crownR.setColorAt(i, tmp.setHSL(0.26 + o.r * 0.07, 0.45, 0.28 + o.r * 0.1));
-    });
-    pine.forEach((o, i) => {
-      dummy.position.set(o.x, o.h + o.s, o.z); dummy.rotation.set(0, o.r * 6, 0); dummy.scale.set(o.s, o.s, o.s); dummy.updateMatrix();
-      trunks.setMatrixAt(t++, dummy.matrix);
-      dummy.position.y = o.h + o.s * 3.6; dummy.updateMatrix();
-      crownP.setMatrixAt(i, dummy.matrix);
-      crownP.setColorAt(i, tmp.setHSL(0.36 + o.r * 0.05, 0.4, 0.2 + o.r * 0.08));
-    });
-    const rockMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ flatShading: true }), rocks.length);
-    rocks.forEach((o, i) => {
-      dummy.position.set(o.x, o.h + o.s * 0.3, o.z); dummy.rotation.set(o.r * 3, o.r * 7, o.r * 2);
-      dummy.scale.set(o.s, o.s * (0.6 + o.r * 0.5), o.s * (0.8 + o.r * 0.4)); dummy.updateMatrix();
-      rockMesh.setMatrixAt(i, dummy.matrix);
-      rockMesh.setColorAt(i, tmp.setHSL(0.7, 0.06, 0.38 + o.r * 0.15));
-    });
+    const customTree = customParts('arvore'), customPine = customParts('pinheiro'), customRock = customParts('pedra');
+    if (customTree) customTree.forEach((p) => scatter(p.geometry, p.material, round, standing(-0.1)));
+    else {
+      scatter(trunkGeo, trunkMat, round, (o) => { standing(0)(o); dummy.position.y = o.h + o.s; });
+      const crown = new THREE.IcosahedronGeometry(1.6, 0), m = lambert();
+      scatter(crown, m, round, (o) => {
+        dummy.position.set(o.x, o.h + o.s * 3.2, o.z); dummy.rotation.set(0, o.r * 6, 0);
+        dummy.scale.set(o.s * 1.1, o.s * (0.9 + o.r * 0.4), o.s * 1.1);
+      }, (o) => tmp.setHSL(0.26 + o.r * 0.07, 0.45, 0.28 + o.r * 0.1));
+    }
+    if (customPine) customPine.forEach((p) => scatter(p.geometry, p.material, pine, standing(-0.1)));
+    else {
+      scatter(trunkGeo, trunkMat, pine, (o) => { standing(0)(o); dummy.position.y = o.h + o.s; });
+      const cone = new THREE.ConeGeometry(1.5, 4.2, 7), m = lambert();
+      scatter(cone, m, pine, (o) => { standing(0)(o); dummy.position.y = o.h + o.s * 3.6; },
+        (o) => tmp.setHSL(0.36 + o.r * 0.05, 0.4, 0.2 + o.r * 0.08));
+    }
+    if (customRock) {
+      customRock.forEach((p) => scatter(p.geometry, p.material, rocks, (o) => {
+        dummy.position.set(o.x, o.h - o.s * 0.15, o.z); dummy.rotation.set(0, o.r * 7, 0); dummy.scale.setScalar(o.s * (0.8 + o.r * 0.4));
+      }));
+    } else {
+      scatter(new THREE.DodecahedronGeometry(1, 0), lambert(), rocks, (o) => {
+        dummy.position.set(o.x, o.h + o.s * 0.3, o.z); dummy.rotation.set(o.r * 3, o.r * 7, o.r * 2);
+        dummy.scale.set(o.s, o.s * (0.6 + o.r * 0.5), o.s * (0.8 + o.r * 0.4));
+      }, (o) => tmp.setHSL(0.7, 0.06, 0.38 + o.r * 0.15));
+    }
     // Cristais da gruta
     const crystals = [];
     for (let i = 0; i < 46; i++) {
@@ -330,7 +358,7 @@ export class World {
       crystalMesh.setMatrixAt(i, dummy.matrix);
       crystalMesh.setColorAt(i, tmp.setHSL(o.r > 0.5 ? 0.75 : 0.52, 0.8, 0.62));
     });
-    for (const m of [trunks, crownR, crownP, rockMesh, crystalMesh]) this.scene.add(m);
+    this.scene.add(crystalMesh);
   }
 
   buildPlaces() {
@@ -357,9 +385,16 @@ export class World {
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + 0.6;
       const x = A.x + Math.cos(a) * 13, z = A.z + Math.sin(a) * 13;
-      const tent = new THREE.Mesh(new THREE.ConeGeometry(3.2, 4.5, 6), hide);
-      tent.position.set(x, this.heightAt(x, z) + 2.2, z);
-      this.scene.add(tent);
+      const custom = makeCustom('tenda');
+      if (custom) {
+        custom.root.position.set(x, this.heightAt(x, z) - 0.1, z);
+        custom.root.rotation.y = Math.atan2(A.x - x, A.z - z);
+        this.scene.add(custom.root);
+      } else {
+        const tent = new THREE.Mesh(new THREE.ConeGeometry(3.2, 4.5, 6), hide);
+        tent.position.set(x, this.heightAt(x, z) + 2.2, z);
+        this.scene.add(tent);
+      }
       this.addCollider(x, z, 3);
     }
     const f2 = makeCampfire();
@@ -374,7 +409,8 @@ export class World {
     this.villageLevel = level;
     this.villageGroup.clear();
     this.hutSpots.forEach((s, i) => {
-      const hut = makeHut(i < level * 3 ? 1 : 0);
+      const lvl = i < level * 3 ? 1 : 0;
+      const hut = makeCustom(lvl ? 'casa' : 'cabana') || makeHut(lvl);
       hut.root.position.set(s.x, this.heightAt(s.x, s.z) - 0.2, s.z);
       hut.root.rotation.y = s.rot;
       this.villageGroup.add(hut.root);
@@ -451,6 +487,8 @@ export class World {
     this.scene.fog.color.copy(bottom);
     this.stars.material.opacity = 1 - day;
     this.sky.position.copy(camera.position);
+    const far = this.scene.fog.far + 60;
+    for (const c of this.chunks) c.mesh.visible = Math.hypot(c.x - camera.position.x, c.z - camera.position.z) < far;
     this.stars.position.copy(camera.position);
     const dir = new THREE.Vector3(Math.cos(th), Math.max(0.15, Math.abs(el)), 0.35).normalize();
     if (el < -0.05) dir.x *= -1;

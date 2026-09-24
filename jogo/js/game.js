@@ -155,7 +155,13 @@ export class Game {
     switch (type) {
       case 'aranha': return this.model('aranha', M.makeSpider);
       case 'lobo': return this.model('lobo', () => M.makeWolf({ horn: true }));
-      case 'loboAlfa': return this.model('loboAlfa', () => M.makeWolf({ color: 0x121218, eye: 0xff4040, horn: true }));
+      case 'loboAlfa': return this.model('loboAlfa', () => {
+        // Sem modelo próprio: usa o lobo do Meshy, maior e mais escuro.
+        const c = M.makeCustom('lobo');
+        if (!c) return M.makeWolf({ color: 0x121218, eye: 0xff4040, horn: true });
+        c.mats.forEach((mt) => mt.color && mt.color.multiplyScalar(0.45));
+        return c;
+      });
       case 'morcego': return this.model('morcego', M.makeBat);
       case 'serpente': return this.model('serpente', M.makeSnake);
       case 'lagarto': return this.model('lagarto', M.makeLizard);
@@ -192,7 +198,7 @@ export class Game {
   createMonster(type, x, z) {
     const def = MONSTERS[type];
     const model = this.prepModel(this.makeMonsterModel(type));
-    const scale = M.hasCustom(type) ? 1 : def.size;
+    const scale = M.hasCustom(type) ? 1 : type === 'loboAlfa' && M.hasCustom('lobo') ? 1.6 : def.size;
     model.root.scale.setScalar(scale);
     const shadow = M.makeShadow(RADIUS[type]);
     this.scene.add(model.root, shadow);
@@ -216,15 +222,21 @@ export class Game {
   }
 
   createNPCs() {
-    const d = this.model('dragao', M.makeDragon);
+    const custom = M.makeCustom('dragao');
+    const d = custom || M.makeDragon();
     d.root.position.set(PLACES.dragao.x, this.world.heightAt(PLACES.dragao.x, PLACES.dragao.z), PLACES.dragao.z);
     d.root.rotation.y = Math.PI;
-    if (!M.hasCustom('dragao')) d.root.scale.setScalar(DRAGON_SCALE);
+    if (custom) {
+      this.dragonSeal = M.makeSeal();
+      this.dragonSeal.root.position.set(0, 5 * DRAGON_SCALE, DRAGON_SCALE);
+      this.dragonSeal.root.scale.setScalar(DRAGON_SCALE);
+      d.root.add(this.dragonSeal.root);
+    } else d.root.scale.setScalar(DRAGON_SCALE);
     this.scene.add(d.root);
     this.dragon = { model: d, pos: d.root.position };
     if (this.flags.has('dragaoAbsorvido')) d.root.visible = false;
 
-    const el = this.model('anciao', () => M.makeGoblin(true));
+    const el = M.makeCustom('anciao') || this.elderFromGoblin() || M.makeGoblin(true);
     const ex = PLACES.anciao.x, ez = PLACES.anciao.z;
     el.root.position.set(ex, this.world.heightAt(ex, ez), ez);
     this.scene.add(el.root, this.placeShadow(M.makeShadow(0.6), ex, ez));
@@ -247,6 +259,21 @@ export class Game {
       g.hp = g.hpMax;
     }
     this.world.setVillageLevel(this.villageLevel());
+  }
+
+  // Sem modelo próprio do ancião: usa o goblin do Meshy com um cajado brilhante.
+  elderFromGoblin() {
+    const c = M.makeCustom('goblin');
+    if (!c) return null;
+    const staff = new THREE.Group();
+    staff.add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.5, 5), new THREE.MeshLambertMaterial({ color: 0x6b4a2a })));
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.1, 0), new THREE.MeshBasicMaterial({ color: 0x7dffc8 }));
+    gem.position.y = 0.8;
+    staff.add(gem);
+    staff.position.set(0.45, 0.75, 0.15);
+    c.root.add(staff);
+    c.mats.forEach((m) => m.color && m.color.lerp(new THREE.Color(0xd8d0c0), 0.25));
+    return c;
   }
 
   placeShadow(s, x, z) { s.position.set(x, this.world.groundAt(x, z) + 0.03, z); return s; }
@@ -1449,7 +1476,9 @@ export class Game {
       let rel = a;
       while (rel > Math.PI) rel -= Math.PI * 2;
       while (rel < -Math.PI) rel += Math.PI * 2;
-      d.model.anim(dt, { t: this.t, look: clamp(rel, -0.7, 0.7), unsealed: this.flags.has('dragaoAbsorvido') });
+      const st = { t: this.t, look: clamp(rel, -0.7, 0.7), unsealed: this.flags.has('dragaoAbsorvido'), moving: false, speed: 0, attack: -1 };
+      d.model.anim(dt, st);
+      if (this.dragonSeal) this.dragonSeal.anim(dt, st);
     }
     const e = this.elder;
     const ea = Math.atan2(p.pos.x - e.pos.x, p.pos.z - e.pos.z);

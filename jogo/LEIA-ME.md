@@ -30,7 +30,11 @@ O progresso é salvo sozinho no navegador a cada 15 segundos.
 
 ## Modelos do Meshy
 
-Os modelos atuais são feitos por código. Para trocar por modelos do Meshy:
+Já vieram do Meshy: lobo (o Lobo Alfa usa o mesmo modelo, maior e mais escuro), aranha, serpente, morcego, goblin (o ancião usa o goblin com um cajado), hobgoblin, dragão, pinheiro, pedra e cabana. O resto continua feito por código. A árvore redonda saiu quebrada e foi descartada (veja `ferramentas/meshy-modelos.json`).
+
+Os originais ficam em `ferramentas/brutos/` (fora do git). O script reduz as texturas para webp antes de colocar no jogo.
+
+Para gerar mais:
 
 ```bash
 export MESHY_API_KEY=msy_...                        # nunca coloque a chave no código

@@ -460,24 +460,35 @@ export function makeDragon() {
     k.add(root, sphere(1.3 - t * 1.0, 8, 6), scale, Math.sin(a) * 5.5, 1.6 - t * 0.9, -4 - Math.cos(a) * 1 - t * 4);
   }
   [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(([sx, sz]) => k.add(root, box(0.9, 1.4, 1.2), scale, sx * 2.4, 0.7, sz * 2.4));
-  // O selo
-  const seal = k.pivot(root, 0, 5, 1);
-  const sealSphere = k.add(seal, sphere(11, 24, 16), k.mat(0x8f6bff, {
+  const seal = makeSeal();
+  seal.root.position.set(0, 5, 1);
+  root.add(seal.root);
+  function anim(dt, s) {
+    body.scale.y = 0.8 + Math.sin(s.t * 0.8) * 0.02;
+    seal.anim(dt, s);
+    head.rotation.y += ((s.look ?? 0) - head.rotation.y) * Math.min(1, dt * 1.5);
+  }
+  return { root, mats: k.mats, anim, height: 8 };
+}
+
+// O selo mágico em volta do dragão (também usado com o dragão do Meshy).
+export function makeSeal() {
+  const k = kit();
+  const root = new THREE.Group();
+  const sealSphere = k.add(root, sphere(11, 24, 16), k.mat(0x8f6bff, {
     transparent: true, opacity: 0.1, emissive: 0x6a4dff, emissiveIntensity: 0.6, depthWrite: false, side: THREE.DoubleSide, flatShading: false,
   }));
   const rings = [0, 1, 2].map((i) => {
     const r = new THREE.Mesh(geo('sealRing', () => new THREE.TorusGeometry(11.3, 0.07, 5, 72)), k.glow(0xb49bff, 1.5));
     r.rotation.set(i * 1.1, i * 0.7, 0);
-    seal.add(r);
+    root.add(r);
     return r;
   });
   function anim(dt, s) {
-    body.scale.y = 0.8 + Math.sin(s.t * 0.8) * 0.02;
     rings.forEach((r, i) => { r.rotation.y += dt * (0.15 + i * 0.07); r.rotation.x += dt * 0.05 * (i - 1); });
     sealSphere.material.opacity = s.unsealed ? 0 : 0.08 + Math.sin(s.t * 1.3) * 0.03;
-    head.rotation.y += ((s.look ?? 0) - head.rotation.y) * Math.min(1, dt * 1.5);
   }
-  return { root, mats: k.mats, anim, height: 8 };
+  return { root, mats: k.mats, anim };
 }
 
 // ---------------------------------------------------------------- Vila
@@ -590,7 +601,16 @@ async function loadGLTF(id) {
   if (!hasCustom(id)) return null;
   if (!gltfCache.has(id)) {
     if (!loaderPromise) loaderPromise = import('three/addons/loaders/GLTFLoader.js').then((m) => new m.GLTFLoader());
-    gltfCache.set(id, loaderPromise.then((loader) => loader.loadAsync('modelos/' + manifest[id].arquivo)).catch(() => null));
+    const file = 'modelos/' + manifest[id].arquivo;
+    gltfCache.set(id, loaderPromise.then(async (loader) => {
+      // Na versão publicada no claude.ai os GLB vão em base64 dentro de um .txt.
+      if (!file.endsWith('.txt')) return loader.loadAsync(file);
+      const b64 = await (await fetch(file)).text();
+      const bin = atob(b64.trim());
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return loader.parseAsync(bytes.buffer, 'modelos/');
+    }).catch((e) => { console.warn('modelo', id, e); return null; }));
   }
   return gltfCache.get(id);
 }
@@ -599,6 +619,27 @@ async function loadGLTF(id) {
 export async function preloadCustom() {
   if (!manifest) await loadManifest();
   await Promise.all(Object.keys(manifest).map((id) => loadGLTF(id).then((g) => { if (g) gltfCache.set(id, Promise.resolve(g)); manifest[id]._gltf = g; })));
+}
+
+// Peças (geometria + material) de um GLB, já na escala do jogo, para usar em InstancedMesh.
+export function customParts(id) {
+  const entry = manifest && manifest[id];
+  if (!entry || !entry._gltf) return null;
+  const scene = entry._gltf.scene;
+  scene.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(scene);
+  const size = bb.getSize(new THREE.Vector3());
+  const sc = (entry.altura || 1) / Math.max(0.001, size.y);
+  const norm = new THREE.Matrix4().makeScale(sc, sc, sc)
+    .multiply(new THREE.Matrix4().makeTranslation(-(bb.min.x + size.x / 2), -bb.min.y, -(bb.min.z + size.z / 2)));
+  const parts = [];
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const g = o.geometry.clone();
+    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(norm, o.matrixWorld));
+    parts.push({ geometry: g, material: o.material });
+  });
+  return parts.length ? parts : null;
 }
 
 export function makeCustom(id) {

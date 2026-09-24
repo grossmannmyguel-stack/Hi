@@ -7,6 +7,7 @@
     "meshy": "node meshy.mjs"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.5.0",
     "esbuild": "^0.25.0"
   }
 }
