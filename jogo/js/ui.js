@@ -53,7 +53,13 @@ export class UI {
       lbl.className = 'lbl';
       lbl.textContent = label;
       b.prepend(lbl);
-      if (ACT[act] !== undefined && !b.classList.contains('small') && !b.classList.contains('talk') && !b.classList.contains('evolve')) {
+      if (ACT[act] !== undefined && (b.classList.contains('small') || b.classList.contains('talk') || b.classList.contains('evolve'))) {
+        const ico = document.createElement('i');
+        ico.className = 'ico-in';
+        ico.style.backgroundImage = 'url(ui/icones-acoes.jpg)';
+        ico.style.backgroundPosition = pos(ACT[act]);
+        b.prepend(ico);
+      } else if (ACT[act] !== undefined) {
         const ico = document.createElement('i');
         ico.className = 'ico';
         ico.style.backgroundImage = 'url(ui/icones-acoes.jpg)';

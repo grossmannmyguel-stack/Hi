@@ -116,7 +116,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--sage); outl
 #btnPotion { left: calc(14px + var(--sl)); bottom: calc(14px + var(--sb)); background: rgba(20,40,24,0.75); border-color: rgba(140,240,90,0.5); }
 #btnPotion b { color: #8cf05a; margin-left: 4px; font-variant-numeric: tabular-nums; }
 #btnPotion.empty { opacity: 0.5; }
-#btnForm { left: calc(112px + var(--sl)); bottom: calc(14px + var(--sb)); }
+#btnForm { left: calc(150px + var(--sl)); bottom: calc(14px + var(--sb)); }
 .act.talk { width: auto; height: 46px; border-radius: 23px; padding: 0 20px; right: calc(128px + var(--sr)); bottom: calc(176px + var(--sb)); font-size: 12px; background: rgba(9,14,36,0.85); border-color: var(--gold); color: var(--gold); }
 .act.evolve { width: auto; height: 46px; border-radius: 23px; padding: 0 22px; left: 50%; transform: translateX(-50%); bottom: calc(18px + var(--sb)); font-size: 13px; letter-spacing: 0.14em; color: #1a1206; background: linear-gradient(180deg, #ffe08a, var(--gold)); border: none; box-shadow: 0 0 22px rgba(242,193,78,0.6); animation: glow 1.4s ease-in-out infinite; }
 .act.evolve.down { transform: translateX(-50%) scale(0.94); }
@@ -134,7 +134,7 @@ body.portrait .vitals { width: min(212px, 52vw); }
 .panel-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 0 14px; }
 .panel-head h2 { font-family: var(--display); font-size: 18px; margin: 0; flex: 1; }
 .close { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--edge); background: transparent; font-size: 18px; }
-#menuTabs { display: flex; gap: 4px; padding: 10px 12px 0; overflow-x: auto; flex-wrap: nowrap; }
+#menuTabs { display: flex; gap: 4px; padding: 14px 12px 4px; overflow-x: auto; flex-wrap: nowrap; }
 #menuTabs button { flex: 0 0 auto; border: 1px solid transparent; background: transparent; padding: 8px 12px; border-radius: 10px; font-weight: 700; font-size: 13px; color: var(--muted); }
 #menuTabs button.on { color: var(--ink); background: rgba(88,196,255,0.14); border-color: var(--edge); }
 .panel-body { padding: 12px 16px 18px; overflow-y: auto; -webkit-overflow-scrolling: touch; font-size: 13.5px; line-height: 1.45; user-select: text; -webkit-user-select: text; }
@@ -258,6 +258,12 @@ body.has-icons .act .ico { opacity: 1; }
 body.has-icons .act .lbl { position: absolute; left: 0; right: 0; bottom: 6px; font-size: 8.5px; }
 body.has-icons .act.big .lbl { bottom: 9px; font-size: 10px; }
 .act.predator .lbl { font-size: 8px; letter-spacing: 0.02em; }
+.ico-in { display: none; width: 28px; height: 28px; margin: 0 6px 0 -8px; border-radius: 50%; background-size: 300% 300%; flex: 0 0 28px; }
+body.has-icons .ico-in { display: inline-block; }
+body.has-icons .act.small, body.has-icons .act.talk, body.has-icons .act.evolve { display: flex; align-items: center; }
+body.has-icons .act.small .lbl, body.has-icons .act.talk .lbl, body.has-icons .act.evolve .lbl { position: static; font-size: 11px; }
+body.has-icons .act.evolve .lbl { color: #1a1206; text-shadow: none; }
+.act.big .ico, .act.predator .ico { inset: -2px; }
 .act.big { background: radial-gradient(circle at 40% 30%, #6a1f2e, #1a0610 72%); }
 .act.predator { background: radial-gradient(circle at 40% 30%, #4a2a8a, #12082a 72%); }
 .act.predator.ready { box-shadow: 0 0 0 3px #0a0f25, 0 0 0 5px var(--sage), 0 0 24px rgba(159,243,232,0.8); }
