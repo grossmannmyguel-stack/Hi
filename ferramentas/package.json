@@ -1,0 +1,12 @@
+{
+  "name": "slime-renascido-ferramentas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build-artifact.mjs",
+    "meshy": "node meshy.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

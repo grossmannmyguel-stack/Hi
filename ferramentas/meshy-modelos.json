@@ -1,0 +1,19 @@
+{
+  "_leia": "Lista de modelos para gerar no Meshy. 'id' precisa bater com o nome usado no jogo (js/game.js). 'altura' é em metros no jogo. 'prioridade' 1 = gerar primeiro.",
+  "modelos": [
+    { "id": "lobo", "prioridade": 1, "altura": 1.9, "prompt": "stylized dark grey dire wolf monster with one small horn on the forehead, glowing yellow eyes, standing on four legs, fantasy game asset, clean low poly" },
+    { "id": "aranha", "prioridade": 1, "altura": 1.4, "prompt": "giant forest spider monster, dark brown body with red markings, eight long legs, fantasy game asset, clean low poly" },
+    { "id": "ogroChefe", "prioridade": 1, "altura": 4.2, "humanoide": true, "prompt": "huge red-skinned ogre chieftain with two white horns, tribal leather armor, holding a big wooden club, fantasy game character, A-pose" },
+    { "id": "hobgoblin", "prioridade": 1, "altura": 1.75, "humanoide": true, "prompt": "green hobgoblin warrior with pointy ears, leather and steel armor, holding a spear, stylized fantasy game character, A-pose" },
+    { "id": "dragao", "prioridade": 1, "altura": 8, "prompt": "massive storm dragon lying down and resting, dark blue-black scales, golden eyes, folded wings, long tail, fantasy game asset" },
+    { "id": "humano", "prioridade": 2, "altura": 1.62, "humanoide": true, "prompt": "young fantasy hero with long silver-blue hair and golden eyes, dark blue coat with a cape, holding a katana, stylized anime game character, A-pose" },
+    { "id": "loboAlfa", "prioridade": 2, "altura": 2.9, "prompt": "huge black alpha dire wolf with one silver horn on the forehead, glowing red eyes, battle scars, fantasy game asset" },
+    { "id": "serpente", "prioridade": 2, "altura": 1.2, "prompt": "giant black serpent monster with purple scales pattern, coiled, glowing green eyes, fantasy game asset" },
+    { "id": "lagarto", "prioridade": 2, "altura": 1.4, "prompt": "armored lizard monster with steel plates on its back, walking on four short legs, fantasy game asset" },
+    { "id": "morcego", "prioridade": 2, "altura": 0.9, "prompt": "giant bat monster with open wings, purple-brown fur, red eyes, flying pose, fantasy game asset" },
+    { "id": "ogro", "prioridade": 3, "altura": 3.2, "humanoide": true, "prompt": "big orange-skinned ogre brute with two horns, loincloth, holding a wooden club, fantasy game character, A-pose" },
+    { "id": "goblin", "prioridade": 3, "altura": 1.1, "humanoide": true, "prompt": "small skinny green goblin with pointy ears and ragged loincloth, cute stylized fantasy game character, A-pose" },
+    { "id": "anciao", "prioridade": 3, "altura": 1.05, "humanoide": true, "prompt": "old goblin village elder with long white beard, wooden staff with a glowing green gem, stylized fantasy game character" },
+    { "id": "slime0", "prioridade": 3, "altura": 1.0, "prompt": "cute blue slime monster, translucent jelly teardrop shape, simple dot eyes, stylized game asset" }
+  ]
+}
